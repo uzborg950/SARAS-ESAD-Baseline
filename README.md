@@ -1,4 +1,4 @@
-# Pure pytorch.1.x implementation of RetinaNet
+# Pure pytorch.1.x implementation of Endo-Scopic Action Detection 
 ## OHEM Loss, Focal Loss, and YOLO Loss on top of FPN
 
 ## Introduction
