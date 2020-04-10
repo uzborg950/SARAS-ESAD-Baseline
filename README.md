@@ -2,7 +2,8 @@
 ## OHEM Loss, Focal Loss, and YOLO Loss on top of FPN
 
 ## Introduction
-This repository implements a pure pytorch [Focal-Loss for Object Detection](https://arxiv.org/pdf/1708.02002.pdf) paper. Aim of this repository try different loss functions and make a fair comparison in terms of performance/training -time/-GPU-memory. 
+
+This repository implements a pure pytorch [Focal-Loss for ACTION Detection](https://arxiv.org/pdf/1708.02002.pdf) paper. Aim of this repository try different loss functions and make a fair comparison in terms of performance/training -time/-GPU-memory. 
 
 At the moment we support pytorch-1.2 and ubuntu with Anaconda distribution of python. Tested on a single machine with 8 GPUs, works on 4 GPUs as well.
 
