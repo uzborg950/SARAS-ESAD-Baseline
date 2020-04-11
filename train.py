@@ -1,10 +1,6 @@
-
-
-
 """ 
 
-    Author: Gurkirt Singh
-    Started on: 13th March 2019
+    Author: Vivek Singh and Gurkirt Singh 
     Parts of this files are from many github repos
     @longcw faster_rcnn_pytorch: https://github.com/longcw/faster_rcnn_pytorch
     @rbgirshick py-faster-rcnn https://github.com/rbgirshick/py-faster-rcnn
@@ -18,7 +14,6 @@
     
     Please don't remove above credits and give star to these repos
     Licensed under The MIT License [see LICENSE for details]
-    
 """
 
 import os
@@ -88,7 +83,7 @@ parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min J
 # Evaluation hyperparameters
 parser.add_argument('--intial_val', default=5000, type=int, help='Initial number of training iterations before evaluation')
 parser.add_argument('--val_step', default=25000, type=int, help='Number of training iterations before evaluation')
-parser.add_argument('--iou_thresh', default=0.5, type=float, help='Evaluation threshold')
+parser.add_argument('--iou_thresh', default=0.25, type=float, help='Evaluation threshold')
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
 parser.add_argument('--topk', default=100, type=int, help='topk for evaluation')
@@ -98,16 +93,16 @@ parser.add_argument('--log_start', default=149, type=int, help='start loging aft
 parser.add_argument('--log_step', default=10, type=int, help='Log every k steps for text/Visdom/tensorboard')
 parser.add_argument('--tensorboard', default=False, type=str2bool, help='Use tensorboard for loss/evalaution visualization')
 parser.add_argument('--visdom', default=False, type=str2bool, help='Use visdom for loss/evalaution visualization')
-parser.add_argument('--vis_port', default=8098, type=int, help='Port for Visdom Server')
+parser.add_argument('--vis_port', default=8093, type=int, help='Port for Visdom Server')
 
 # Program arguments
 parser.add_argument('--man_seed', default=123, type=int, help='manualseed for reproduction')
 parser.add_argument('--multi_gpu', default=True, type=str2bool, help='If  more than 0 then use all visible GPUs by default only one GPU used ') 
 
 # Use CUDA_VISIBLE_DEVICES=0,1,4,6 to select GPUs to use
-parser.add_argument('--data_root', default='/mnt/mercury-fast/datasets/', help='Location to root directory fo dataset') # /mnt/mars-fast/datasets/
-parser.add_argument('--save_root', default='/mnt/mercury-fast/datasets/', help='Location to save checkpoint models') # /mnt/sun-gamma/datasets/
-parser.add_argument('--model_dir', default='', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
+parser.add_argument('--data_root', default='/mnt/sun-beta/saras_data/MIDL_dataset/', help='Location to root directory fo dataset') # /mnt/mars-fast/datasets/
+parser.add_argument('--save_root', default='/mnt/sun-beta/vivek/MIDLbaseline', help='Location to save checkpoint models') # /mnt/sun-gamma/datasets/
+parser.add_argument('--model_dir', default='/mnt/sun-beta/vivek/weights/', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
 
 
 ## Parse arguments
@@ -145,14 +140,14 @@ def main():
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means, std=args.stds)])
 
-    train_dataset = DetectionDataset(args, train=True, image_sets=args.train_sets, transform=train_transform)
+    train_dataset = DetectionDataset(root= args.data_root, train=True, image_sets='train', transform=train_transform)
     print('Done Loading Dataset Train Dataset :::>>>\n',train_dataset.print_str)
     val_transform = transforms.Compose([ 
                         Resize(args.min_size, args.max_size),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
                         
-    val_dataset = DetectionDataset(args, train=False, image_sets=args.val_sets, transform=val_transform, full_test=False)
+    val_dataset = DetectionDataset(root= args.data_root, train=False, image_sets='val', transform=val_transform, full_test=False)
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
     
     args.num_classes = len(train_dataset.classes) + 1
@@ -220,7 +215,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     print('Train-DATA :::>>>', train_dataset.print_str)
     print('VAL-DATA :::>>>', val_dataset.print_str)
     epoch_size = len(train_dataset) // args.batch_size
-    print('Training FPN on ', train_dataset.dataset,'\n')
+#    print('Training FPN on ', train_dataset.dataset,'\n')
 
     if args.visdom:
         import visdom
@@ -271,6 +266,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             if iteration > args.max_iter:
                 break
             iteration += 1
+#            pdb.set_trace()
             epoch = int(iteration/num_bpe)
             images = images.cuda(0, non_blocking=True)
             gts = gts.cuda(0, non_blocking=True)
@@ -291,7 +287,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             optimizer.step()
             scheduler.step()
 
-            # pdb.set_trace()
+#            pdb.set_trace()
             loc_loss = loss_l.item()
             conf_loss = loss_c.item()
             

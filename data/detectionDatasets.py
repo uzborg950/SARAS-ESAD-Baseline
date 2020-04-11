@@ -6,6 +6,7 @@ Copyright (c) 2019 Gurkirt Singh
 """
 
 import json
+import csv
 import torch
 import pdb, time
 import torch.utils.data as data
@@ -16,6 +17,70 @@ import numpy as np
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 from PIL import Image, ImageDraw
+import glob
+
+
+#folder= '/mnt/sun-beta/saras_data/MIDL_dataset/'
+
+
+
+def read_file(path):
+    with open(path, 'r') as f:
+        data1= f.readlines()
+    
+    if data1: 
+        data2= [sam.split(' ') for sam in data1]
+        data3=[]
+        for i in data2:
+            j= [float(sam) for sam in i]
+            k= [j[1], j[2], j[3], j[4], j[0]]
+            data3.append(k)
+    else:
+        data3= None
+    return(data3)
+
+
+def read_labels(data_files):
+    labels=[]
+    for txt_file in data_files:
+        label= read_file(txt_file)
+        if label is not None:
+            img_path= txt_file.replace('.txt', '.jpg')
+            labels.append([img_path, label])
+    return labels
+
+#%%
+
+def read_train(path):
+    folders= ['set1', 'set2']
+    all_files=[]
+    for path1 in folders:
+        path2= path+ '/train/' + path1
+        data_files= glob.glob(path2+'/*.txt')
+        all_files.extend(data_files)
+        
+    labels= read_labels(all_files)
+    return(labels)
+    
+            
+def make_object_lists(rootpath, subset='train'):
+    '''
+    subset has two options: 
+    train: to read the training images 
+    val: to read the vaidation images
+    '''
+
+    with open(rootpath+'/train/obj.names', 'r') as fil:
+        cls_list= fil.read().split('\n')
+    
+    if subset== 'train':
+        final_labels= read_train(rootpath)
+    elif subset== 'val':
+        path= rootpath+'/val/obj/*.txt'
+        file_paths= glob.glob(path)
+        final_labels= read_labels(file_paths)
+        
+    return(cls_list, final_labels)
 
 
 def resize(image, size):
@@ -23,52 +88,21 @@ def resize(image, size):
     return image
 
 
-def make_object_lists(rootpath, subsets=['train2007']):
-    with open(rootpath + 'annots.json', 'r') as f:
-        db = json.load(f)
-
-    img_list = []
-    names = []
-    cls_list = db['classes']
-    annots = db['annotations']
-    idlist = []
-    if 'ids' in db.keys():
-        idlist = db['ids']
-    ni = 0
-    nb = 0.0
-    print_str = ''
-    for img_id in annots.keys():
-        # pdb.set_trace()
-        if annots[img_id]['set'] in subsets:
-            names.append(img_id)
-            boxes = []
-            labels = []
-            for anno in annots[img_id]['annos']:
-                nb += 1
-                boxes.append(anno['bbox'])
-                labels.append(anno['label'])
-            # print(labels)
-            img_list.append([annots[img_id]['set'], img_id, np.asarray(boxes).astype(np.float32), np.asarray(labels).astype(np.int64), annots[img_id]['wh']])
-            ni += 1
-
-    print_str = '\n\n*Num of images {:d} num of boxes {:d} avergae {:01f}\n\n'.format(ni, int(nb), nb/ni)
-
-    return cls_list, img_list, print_str, idlist
-
-
 class DetectionDataset(data.Dataset):
     """Detection Dataset class for pytorch dataloader"""
 
-    def __init__(self, args, train=True, image_sets=['train2017'], transform=None, anno_transform=None, full_test=False):
+    def __init__(self, root, train=True, image_sets='train', transform=None, anno_transform=None, full_test=False):
 
-        self.dataset = args.dataset
+#        self.dataset = args.dataset
         self.train = train
-        self.root = args.data_root + args.dataset + '/'
+#        self.root = args.data_root
+        self.root= root
         self.image_sets = image_sets
         self.transform = transform
         self.anno_transform = anno_transform
         self.ids = list()
-        self.classes, self.ids, self.print_str, self.idlist = make_object_lists(self.root, image_sets)
+        self.classes, self.ids = make_object_lists(self.root, subset=image_sets)
+        self.print_str= ''
         self.max_targets = 20
     
     def __len__(self):
@@ -76,38 +110,48 @@ class DetectionDataset(data.Dataset):
 
     def __getitem__(self, index):
         annot_info = self.ids[index]
-        subset_str = annot_info[0]
-        img_id = annot_info[1]
-        boxes = annot_info[2] # boxes should be in x1 y1 x2 y2 format
-        labels  =  annot_info[3]
-        wh = annot_info[4]
+        
+        img_path = annot_info[0]
+        bbox_info = np.array(annot_info[1])   # boxes should be in x1 y1 x2 y2 format
+        labels= bbox_info[:,4]
+#        boxes= bbox_info[:,:4]
+        x1= bbox_info[:,0]-bbox_info[:,2]/2
+        y1= bbox_info[:,1]-bbox_info[:,3]/2
+        x2= bbox_info[:,0]+ bbox_info[:,2]/2
+        y2= bbox_info[:,1] + bbox_info[:,3]/2
+        boxes= np.hstack([np.expand_dims(x1, axis=1), np.expand_dims(y1, axis=1),
+                          np.expand_dims(x2, axis=1), np.expand_dims(y2, axis=1)])
 
-        img_name = '{:s}{:s}.jpg'.format(self.root, img_id)
-        # print(img_name)
-        # t0 = time.perf_counter()
-        img = Image.open(img_name).convert('RGB')
+
+        img = Image.open(img_path).convert('RGB')
         orig_w, orig_h = img.size
+
+    
         # print(img.size)
-        if self.train and np.random.random() < 0.5:
-            img = img.transpose(Image.FLIP_LEFT_RIGHT)
-            w = boxes[:, 2] - boxes[:, 0]
-            boxes[:, 0] = 1 - boxes[:, 2] # boxes should be in x1 y1 x2 y2 [0,1] format 
-            boxes[:, 2] = boxes[:, 0] + w # boxes should be in x1 y1 x2 y2 [0,1] format
+#        if self.train and np.random.random() < 0.5:
+#            img = img.transpose(Image.FLIP_LEFT_RIGHT)
+#            w = boxes[:, 2] - boxes[:, 0]
+#            boxes[:, 0] = 1 - boxes[:, 2] # boxes should be in x1 y1 x2 y2 [0,1] format 
+#            boxes[:, 2] = boxes[:, 0] + w # boxes should be in x1 y1 x2 y2 [0,1] format
         
 
-        # print(img.size, wh)
-        img = self.transform(img)
+#         print(img.size, wh)
+        if self.transform is not None:
+            img = self.transform(img)
+#        
         _, height, width = img.shape
-        # print(img.shape, wh)
+#        # print(img.shape, wh)
         wh = [width, height, orig_w, orig_h]
-        # print(wh)
+#        # print(wh)
         boxes[:, 0] *= width # width x1
         boxes[:, 2] *= width # width x2
         boxes[:, 1] *= height # height y1
         boxes[:, 3] *= height # height y2
-
+#
         targets = np.hstack((boxes, np.expand_dims(labels, axis=1)))
         return img, targets, index, wh
+        
+#        return(boxes, labels, img)
 
 def custum_collate(batch):
     targets = []
@@ -137,4 +181,25 @@ def custum_collate(batch):
     cts = torch.LongTensor(counts)
     # print(images_.shape)
     return images_, new_targets, cts, image_ids, whs
+
+if __name__== '__main__':
+#    from torchvision import transforms
+    dataset= DetectionDataset(root= folder, image_sets= 'train')
+    dataset_val= DetectionDataset(root= folder, image_sets= 'val')
+    print('train',len(dataset))
+    print('val',len(dataset_val))
+    
+#    boxes, label, img= dataset[2868]
+#    draw= ImageDraw.Draw(img)
+#    for box in boxes:
+#        draw.rectangle(tuple(box.astype(np.int32)), outline= 'red', width=5)
+#    img.show()
+#    val_data= DetectionDataset(root= folder, image_sets= 'val')    
+    
+#    classes, data= make_object_lists(folder, subset='train')
+#    create_data_csv_files(classes, data, filename='train_data.csv')
+    
+
+
+
 
