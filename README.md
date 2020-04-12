@@ -1,4 +1,5 @@
-# Pure pytorch.1.x implementation of Endo-Scopic Action Detection 
+# Baseline RetinaNet Implementation for Surgeon Action Detection for endoscopic images in pytorch.1.x 
+### This baseline model is developed for SARAS-ESAD 2020 challenge. To download the dataset and participate in the challenge, please register at [SARAS-ESAD website](https://saras-esad.grand-challenge.org).
 ## OHEM Loss, Focal Loss, and YOLO Loss on top of FPN
 
 ## Introduction
@@ -54,10 +55,10 @@ Loss |depth | input | AP    | AP_50   | AP_75 | AP_S | AP_M | AP_L |
 - visdom and tensorboardX if you want to use the visualisation of loss and evaluation
   - if you want to use them set visdom/tensorboard flag equal to true while training 
   - and configure the visdom port in arguments in  `train.py.`
-- You will need to install [COCO-API](https://github.com/cocodataset/cocoapi) to use evalute script.
 
 ### Datasets and other downloads
-- Please follow dataset preparation [README](https://github.com/gurkirt/FPN.pytorch/tree/master/prep) from [`prep`](https://github.com/gurkirt/RetinaNet/tree/master/prep) folder of this repo.
+- Please visit [SARAS-ESAD](https://saras-esad.grand-challenge.org) website to download the dataset for surgeon action detection. 
+- Extract all the sets (train and val) from zip files and put them under single directory. Provide the path of that directory as data_root in train file. Data prepocessing and feeding pipeline is in [detectionDatasets.py](https://github.com/Viveksbawa/SARAS-ESAD-baseline/blob/master/data/detectionDatasets.py) file.
 - Weights are initialised with imagenet pretrained models, specify the path of pre-saved models, `model_dir` in `train.py`. Download them from [torchvision models](https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py). This is a requirement of training process. 
 
 
@@ -81,38 +82,9 @@ Model is evaluated and saved after each `25K` iterations.
 
 mAP@0.5 is computed after every `25K` iterations and at the end.
 
-Coco evaluation protocol is demonstraed  in `evaluate.py` 
-
 
 ```
 python evaluate.py --loss_type=focal
 ```
 
-## COCO-API Result
-Here are results on COCO dataset using [COCO-API](https://github.com/cocodataset/cocoapi).
-Results using `cocoapi` are slightly different than above table what you see during training time. 
 
-
-#### TODO update the results below.
-```
-    Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.348
-    Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.525
-    Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.370
-    Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.169
-    Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.380
-    Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.489
-    Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.298
-    Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.454
-    Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.487
-    Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.268
-    Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.536
-    Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.651
-
-```
-
-## TODO
-- Improve memory footprint
-    - Use clustering for batch making  so all the images of similar size
-    - see if we can improve loss functions
-- Implement multi-scale training
-- Implement fast evaluation like in paper
