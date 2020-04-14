@@ -35,11 +35,8 @@ from data import DetectionDataset, custum_collate
 from models.retinanet_shared_heads import build_retinanet_shared_heads
 from torchvision import transforms
 from data.transforms import Resize
-from train import validate
 
 parser = argparse.ArgumentParser(description='Training single stage FPN with OHEM, resnet as backbone')
-# anchor_type to be used in the experiment
-parser.add_argument('--anchor_type', default='kmeans', help='kmeans or default')
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
 parser.add_argument('--basenet', default='resnet50', help='pretrained base model')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
@@ -51,7 +48,7 @@ parser.add_argument('--use_bias', default=True, type=str2bool,help='0 mean no bi
 parser.add_argument('--dataset', default='esad', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment 
 parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
-parser.add_argument('--max_size', default=1000, type=int, help='Input Size for FPN')
+parser.add_argument('--max_size', default=1024, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
@@ -60,14 +57,14 @@ parser.add_argument('--num_workers', '-j', default=8, type=int, help='Number of 
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
-parser.add_argument('--eval_iters', default='90000', type=str, help='Chnage the lr @')
+parser.add_argument('--eval_iters', default='6000', type=str, help='Chnage the lr @')
 
 # Freeze batch normlisatio layer or not 
 parser.add_argument('--fbn', default=True, type=bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
 parser.add_argument('--freezeupto', default=1, type=int, help='if 0 freeze or else keep updating bn layers')
 
 # Evaluation hyperparameters
-parser.add_argument('--iou_thresh', default=0.5, type=float, help='Evaluation threshold')
+parser.add_argument('--iou_threshs', default='', type=str, help='Evaluation thresholds')
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.5, type=float, help='NMS threshold')
 parser.add_argument('--topk', default=25, type=int, help='topk for evaluation')
@@ -83,8 +80,8 @@ parser.add_argument('--multi_gpu', default=1, type=int, help='If  more than then
 
 # source or dstination directories
 parser.add_argument('--data_root', default='/mnt/mercury-fast/datasets/', help='Location to root directory fo dataset') # /mnt/mars-fast/datasets/
-parser.add_argument('--save_root', default='/mnt/mercury-fast/datasets/', help='Location to save checkpoint models') # /mnt/sun-gamma/datasets/
-parser.add_argument('--model_dir', default='', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
+parser.add_argument('--save_root', default='/mnt/mercury-alpha/', help='Location to save checkpoint models') # /mnt/sun-gamma/datasets/
+parser.add_argument('--model_dir', default='/mnt/mars-gamma/global-models/pytorch-imagenet/', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
 
 
 ## Parse arguments
@@ -103,8 +100,9 @@ def main():
     
     args.exp_name = utils.create_exp_name(args)
 
+    args.data_root += args.dataset+'/'
     args.save_root += args.dataset+'/'
-    args.save_root = args.save_root+'cache/'+args.exp_name+'/'
+    args.save_root += 'cache/'+args.exp_name+'/'
 
 
     val_transform = transforms.Compose([ 
@@ -112,8 +110,7 @@ def main():
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
 
-    val_dataset = DetectionDataset(args, train=False, image_sets=args.val_sets, 
-                            transform=val_transform, full_test=False)
+    val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=False)
 
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
 
@@ -133,7 +130,7 @@ def main():
         args.det_itr = iteration
         log_file = open("{pt:s}/testing-{it:06d}-{date:%m-%d-%Hx}.log".format(pt=args.save_root, it=iteration, date=datetime.datetime.now()), "w", 10)
         log_file.write(args.exp_name + '\n')
-        
+        submission_file = open("{pt:s}/submission-{it:06d}-{date:%m-%d-%Hx}.txt".format(pt=args.save_root, it=iteration, date=datetime.datetime.now()), "w", 10)
         args.model_path = args.save_root + 'model_{:06d}.pth'.format(iteration)
         log_file.write(args.model_path+'\n')
     
@@ -149,20 +146,147 @@ def main():
         tt0 = time.perf_counter()
         log_file.write('Testing net \n')
         net.eval() # switch net to evaluation mode
-        
-        mAP, ap_all, ap_strs , det_boxes = validate(args, net, val_data_loader, val_dataset, iteration, iou_thresh=args.iou_thresh)
+        if len(args.iou_threshs)>2:
+            args.iou_threshs = [float(th) for th in args.iou_threshs.split(',')]
+        else:
+            args.iou_threshs = [th for th in np.arange(0.05,0.951,0.05)]
 
-        for ap_str in ap_strs:
-            print(ap_str)
-            log_file.write(ap_str+'\n')
-        ptr_str = '\nMEANAP:::=>'+str(mAP)+'\n'
+        # print(args.iou_threshs)
+        result_list = validate(args, net, val_data_loader, val_dataset, iteration, submission_file, args.iou_threshs)
+
+        for result in result_list:
+            [iou_thresh, mAP, ap_all, ap_strs] = result 
+            ptr_str = '\n\nIOU Threshold: {:0.2f}:: \n\n'.format(iou_thresh)
+            print(ptr_str)
+            log_file.write(ptr_str)
+
+            for ap_str in ap_strs:
+                print(ap_str)
+                log_file.write(ap_str+'\n')
+            
+            ptr_str = '\nMEANAP:::=>{:0.4f}\n\n'.format(mAP*100)
+            print(ptr_str)
+            log_file.write(ptr_str)
+        
+        ptr_str = 'printing the on mAP results again \n'
         print(ptr_str)
         log_file.write(ptr_str)
+
+        for result in result_list:
+            [iou_thresh, mAP, ap_all, ap_strs] = result 
+            ptr_str = '\n\nIOU Threshold: {:0.2f}:: \n\n'.format(iou_thresh)
+            print(ptr_str)
+            log_file.write(ptr_str)
+            ptr_str = '\nMEANAP:::=>{:0.4f}\n\n'.format(mAP*100)
+            print(ptr_str)
+            log_file.write(ptr_str)
 
         torch.cuda.synchronize()
         print('Complete set time {:0.2f}'.format(time.perf_counter() - tt0))
         log_file.close()
 
+
+def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission_file, iou_threshs=[0.2,0.25,0.3,0.4,0.5,0.75]):
+    """Test a FPN network on an image database."""
+    print('Validating at ', iteration_num)
+    num_images = len(val_dataset)
+    num_classes = args.num_classes
     
+    det_boxes = [[] for _ in range(num_classes-1)]
+    gt_boxes = []
+    print_time = True
+    val_step = 20
+    count = 0
+    torch.cuda.synchronize()
+    ts = time.perf_counter()
+    activation = nn.Sigmoid().cuda()
+    if args.loss_type == 'mbox':
+        activation = nn.Softmax(dim=2).cuda()
+
+    dict_for_json_dump = {}
+
+    with torch.no_grad():
+        for val_itr, (images, targets, batch_counts, img_indexs, wh) in enumerate(val_data_loader):
+
+            torch.cuda.synchronize()
+            t1 = time.perf_counter()
+
+            batch_size = images.size(0)
+
+            images = images.cuda(0, non_blocking=True)
+            decoded_boxes, conf_data = net(images)
+
+            conf_scores_all = activation(conf_data).clone()
+
+            if print_time and val_itr%val_step == 0:
+                torch.cuda.synchronize()
+                tf = time.perf_counter()
+                print('Forward Time {:0.3f}'.format(tf-t1))
+            
+            for b in range(batch_size):
+                image_path = val_dataset.ids[img_indexs[b]][0]
+                image_name = image_path.split('/')[-1]
+                # print(image_name)
+                width, height = wh[b][0], wh[b][1]
+                gt = targets[b, :batch_counts[b]].numpy()
+                gt_boxes.append(gt)
+                # decoded_boxes = decode(loc_data[b], anchors).clone()
+                conf_scores = conf_scores_all[b]
+                #Apply nms per class and obtain the results
+                decoded_boxes_b = decoded_boxes[b]
+                for cl_ind in range(1, num_classes):
+                    # pdb.set_trace()
+                    scores = conf_scores[:, cl_ind].squeeze()
+                    if args.loss_type == 'yolo':
+                        scores = conf_scores[:, cl_ind].squeeze() * conf_scores[:, 0].squeeze() * 5.0
+                    c_mask = scores.gt(args.conf_thresh)  # greater than minmum threshold
+                    scores = scores[c_mask].squeeze()
+                    # print('scores size',c_mask.sum())
+                    if scores.dim() == 0:
+                        # print(len(''), ' dim ==0 ')
+                        det_boxes[cl_ind - 1].append(np.asarray([]))
+                        continue
+                    # boxes = decoded_boxes_b.clone()
+                    l_mask = c_mask.unsqueeze(1).expand_as(decoded_boxes_b)
+                    boxes = decoded_boxes_b[l_mask].clone().view(-1, 4)
+                    # idx of highest scoring and non-overlapping boxes per class
+                    ids, counts = nms(boxes, scores, args.nms_thresh, args.topk*20)  # idsn - ids after nms
+                    scores = scores[ids[:min(args.topk,counts)]].cpu().numpy()
+                    # pick = min(scores.shape[0], 20)
+                    # scores = scores[:pick]
+                    boxes = boxes[ids[:min(args.topk,counts)]].cpu().numpy()
+
+                    for ik in range(boxes.shape[0]):
+                        boxes[ik, 0] = max(0, boxes[ik, 0])
+                        boxes[ik, 2] = min(width, boxes[ik, 2])
+                        boxes[ik, 1] = max(0, boxes[ik, 1])
+                        boxes[ik, 3] = min(height, boxes[ik, 3])
+                        write_string = '{:s} {:0.6f} {:0.6f} {:0.6f} {:0.6f} {:0.6f} {:d}\n'.format(image_name, 
+                                        boxes[ik, 0], boxes[ik, 0], boxes[ik, 0], boxes[ik, 0], scores[ik], cl_ind-1)
+                        submission_file.write(write_string)
+                    
+                    cls_dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=True)
+                    det_boxes[cl_ind-1].append(cls_dets)
+                count += 1
+            
+            if print_time and val_itr%val_step == 0:
+                torch.cuda.synchronize()
+                te = time.perf_counter()
+                print('im_detect: {:d}/{:d} time taken {:0.3f}'.format(count, num_images, te-ts))
+                torch.cuda.synchronize()
+                ts = time.perf_counter()
+            if print_time and val_itr%val_step == 0:
+                torch.cuda.synchronize()
+                te = time.perf_counter()
+                print('NMS stuff Time {:0.3f}'.format(te - tf))
+
+
+    print('Evaluating detections for itration number ', iteration_num)
+    return_list = []
+    for iou_thresh in iou_threshs:
+        mAP, ap_all, ap_strs , _ = evaluate_detections(gt_boxes, det_boxes, val_dataset.classes, iou_thresh=iou_thresh)
+        return_list.append([iou_thresh, mAP, ap_all, ap_strs])
+    return return_list 
+
 if __name__ == '__main__':
     main()

@@ -230,7 +230,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     num_bpe = len(train_data_loader)
     while iteration <= args.max_iter:
         for i, (images, gts, counts, _, _) in enumerate(train_data_loader):
-            if iteration >= args.max_iter:
+            if iteration > args.max_iter:
                 break
             iteration += 1
             

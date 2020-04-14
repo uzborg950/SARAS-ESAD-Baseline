@@ -89,27 +89,26 @@ mAP@0.25 is computed after every `500` iterations and at the end. You can chnage
 You can evaluate and save the results in json file using `evaluate.py`. It follow the same aruments `train.py`.
 By default it evaluate using the model store at `max_iters`, but you can chnage it any other snapshot/checkpoint.
 
-### AT THE MOMENT it under devlopment
-### TODO
-- reorgnise validate function to accpt multiple iou thresholds
-- write submission file
-
-
 ```
 python evaluate.py --loss_type=focal
 ```
 
+This will dump a log file with **results(mAP)** on validation set and as well as a **submission file**.
 
 ## Results
 Here are the results on `esad` dataset.
 
-Loss   |depth | width | height | AP_25    | AP_50   | AP_75    | AP_MEAN  |   
+Loss   |depth | width | height | AP_10    | AP_30   |  AP_50   | AP_MEAN  |   
 |----- |----- |:----: |:------:| :------: | :------:| :------: | :------: |
-| Focal| 50   |  1024 | 576    | ----     | ----    | ----     | ----     |  
-| OHEM | 50   |  1024 | 576    | ----     | ----    | ---- | **.9** |
+| Focal| 50   |  1024 | 576    | 35.4     | 21.8    | **10.9** | **17.2** |  
+| OHEM | 50   |  1024 | 576    | **37.4** | **23.7**| 10.7     | 16.4 |
 
 ## Details
-- Input image size is `600x1024`.
+- Input image size is `576x1024`.
 - Batch size is set to `16`, the learning rate of `0.01`.
 - Weights for initial layers are frozen see `freezeupto` flag in `train.py`
-
+- max number of iterations is set to 6000
+- SGD is used for optimisation
+- initial learning rate is set to `0.01`
+- learning rate is dropped by the factor of 10 after 4500 iterations
+- Different training setting might result in better/same/worse performance
