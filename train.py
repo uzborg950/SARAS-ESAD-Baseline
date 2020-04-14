@@ -82,11 +82,11 @@ parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min J
 
 # Evaluation hyperparameters
 parser.add_argument('--intial_val', default=500, type=int, help='Initial number of training iterations before evaluation')
-parser.add_argument('--val_step', default=500, type=int, help='Number of training iterations before evaluation')
+parser.add_argument('--val_step', default=1000, type=int, help='Number of training iterations before evaluation')
 parser.add_argument('--iou_thresh', default=0.25, type=float, help='Evaluation threshold')
-parser.add_argument('--conf_thresh', default=0.01, type=float, help='Confidence threshold for evaluation')
+parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
-parser.add_argument('--topk', default=100, type=int, help='topk for evaluation')
+parser.add_argument('--topk', default=50, type=int, help='topk for evaluation')
 
 # Progress logging
 parser.add_argument('--log_start', default=10, type=int, help='start loging after k steps for text/tensorboard') # Let initial ripples settle down

@@ -93,12 +93,11 @@ class DetectionDataset(data.Dataset):
 
         self.train = train
         self.root= root
-        self.mode = mode
         self.input_sets = input_sets
         self.transform = transform
         self.anno_transform = anno_transform
         self.ids = list()
-        self.classes, self.ids = make_object_lists(self.root, mode=mode, input_sets=input_sets)
+        self.classes, self.ids = make_object_lists(self.root, input_sets=input_sets)
         self.print_str= ''
         self.max_targets = 20
         

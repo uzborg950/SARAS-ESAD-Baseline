@@ -33,8 +33,6 @@ from modules.box_utils import decode, nms
 from modules import  AverageMeter
 from data import DetectionDataset, custum_collate
 from models.retinanet_shared_heads import build_retinanet_shared_heads
-from pycocotools.coco import COCO
-from pycocotools.cocoeval import COCOeval
 from torchvision import transforms
 from data.transforms import Resize
 from train import validate
@@ -49,8 +47,8 @@ parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom 
 parser.add_argument('--shared_heads', default=0, type=int,help='4 head layers')
 parser.add_argument('--num_head_layers', default=4, type=int,help='0 mean no shareding more than 0 means shareing')
 parser.add_argument('--use_bias', default=True, type=str2bool,help='0 mean no bias in head layears')
-#  Name of the dataset only voc or coco are supported
-parser.add_argument('--dataset', default='coco', help='pretrained base model')
+#  Name of the dataset only esad is supported
+parser.add_argument('--dataset', default='esad', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment 
 parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
 parser.add_argument('--max_size', default=1000, type=int, help='Input Size for FPN')
@@ -72,7 +70,7 @@ parser.add_argument('--freezeupto', default=1, type=int, help='if 0 freeze or el
 parser.add_argument('--iou_thresh', default=0.5, type=float, help='Evaluation threshold')
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.5, type=float, help='NMS threshold')
-parser.add_argument('--topk', default=100, type=int, help='topk for evaluation')
+parser.add_argument('--topk', default=25, type=int, help='topk for evaluation')
 
 # Progress logging
 parser.add_argument('--log_iters', default=True, type=str2bool, help='Print the loss at each iteration')
@@ -151,10 +149,8 @@ def main():
         tt0 = time.perf_counter()
         log_file.write('Testing net \n')
         net.eval() # switch net to evaluation mode
-        if args.dataset != 'coco':
-            mAP, ap_all, ap_strs , det_boxes = validate(args, net, val_data_loader, val_dataset, iteration, iou_thresh=args.iou_thresh)
-        else:
-            mAP, ap_all, ap_strs , det_boxes = validate_coco(args, net, val_data_loader, val_dataset, iteration, log_file, iou_thresh=args.iou_thresh)
+        
+        mAP, ap_all, ap_strs , det_boxes = validate(args, net, val_data_loader, val_dataset, iteration, iou_thresh=args.iou_thresh)
 
         for ap_str in ap_strs:
             print(ap_str)
@@ -167,150 +163,6 @@ def main():
         print('Complete set time {:0.2f}'.format(time.perf_counter() - tt0))
         log_file.close()
 
-
-def validate_coco(args, net, val_data_loader, val_dataset, iteration_num, resFile_txt, iou_thresh=0.5):
-    """Test a FPN network on an image database."""
-    print('Validating at ', iteration_num)
-
-    annFile='{}/instances_{}.json'.format(args.data_dir,args.val_sets[0])
-    cocoGT=COCO(annFile)
-    coco_dets = []
-    resFile = args.save_root + 'detections-{:05d}.json'.format(args.det_itr)
-    # resFile_txt = open(args.save_root + 'detections-{:05d}.txt'.format(args.det_itr), 'w')
-    num_images = len(val_dataset)
-    num_classes = args.num_classes
-    
-    det_boxes = [[] for _ in range(num_classes-1)]
-    gt_boxes = []
-    print_time = True
-    val_step = 50
-    count = 0
-    torch.cuda.synchronize()
-    ts = time.perf_counter()
-    activation = nn.Sigmoid().cuda()
-    if args.loss_type == 'mbox':
-        activation = nn.Softmax(dim=2).cuda()
-
-    idlist = val_dataset.idlist
-    all_ids = val_dataset.ids
-
-    with torch.no_grad():
-        for val_itr, (images, targets, batch_counts, img_indexs, wh) in enumerate(val_data_loader):
-
-            torch.cuda.synchronize()
-            t1 = time.perf_counter()
-
-            batch_size = images.size(0)
-            height, width = images.size(2), images.size(3)
-
-            images = images.cuda(0, non_blocking=True)
-            decoded_boxes, conf_data = net(images)
-
-            conf_scores_all = activation(conf_data).clone()
-            
-            if print_time and val_itr%val_step == 0:
-                torch.cuda.synchronize()
-                tf = time.perf_counter()
-                print('Forward Time {:0.3f}'.format(tf-t1))
-            
-            for b in range(batch_size):
-                
-                coco_image_id = int(all_ids[img_indexs[b]][1][8:])
-                width, height = wh[b][0], wh[b][1]
-                o_width, o_height = wh[b][2], wh[b][3]
-                # print(wh[b])
-                gt = targets[b, :batch_counts[b]].numpy()
-                gt_boxes.append(gt)
-                decoded_boxes_b = decoded_boxes[b]
-                conf_scores = conf_scores_all[b].clone()
-                #Apply nms per class and obtain the results
-                for cl_ind in range(1, num_classes):
-                    # pdb.set_trace()
-                    scores = conf_scores[:, cl_ind].squeeze()
-                    if args.loss_type == 'yolo':
-                        scores = conf_scores[:, cl_ind].squeeze() * conf_scores[:, 0].squeeze() * 5.0
-                    # scoresth, _ = torch.sort(scores, descending=True)
-                    c_mask = scores.gt(args.conf_thresh)  # greater than minmum threshold
-                    # c_mask = scores.gt(min(max(max_scoresth, args.conf_thresh), min_scoresth))  # greater than minmum threshold
-                    scores = scores[c_mask].squeeze()
-                    # print('scores size',scores.size())
-                    if scores.dim() == 0:
-                        # print(len(''), ' dim ==0 ')
-                        det_boxes[cl_ind - 1].append(np.asarray([]))
-                        continue
-                    boxes = decoded_boxes_b.clone()
-                    l_mask = c_mask.unsqueeze(1).expand_as(boxes)
-                    boxes = boxes[l_mask].view(-1, 4)
-                    # idx of highest scoring and non-overlapping boxes per class
-                    ids, counts = nms(boxes, scores, args.nms_thresh, args.topk*10)  # idsn - ids after nms
-                    scores = scores[ids[:counts]].cpu().numpy()
-                    pick = min(scores.shape[0], args.topk)
-                    scores = scores[:pick]
-                    boxes = boxes[ids[:counts]].cpu().numpy()
-                    boxes = boxes[:pick, :]
-
-                    cls_id = cl_ind-1
-                    if len(idlist)>0:
-                        cls_id = idlist[cl_ind-1]
-                    # pdb.set_trace()
-                    for ik in range(boxes.shape[0]):
-                        boxes[ik, 0] = max(0, boxes[ik, 0])
-                        boxes[ik, 2] = min(width, boxes[ik, 2])
-                        boxes[ik, 1] = max(0, boxes[ik, 1])
-                        boxes[ik, 3] = min(height, boxes[ik, 3])
-                        # box_ = [round(boxes[ik, 0], 1), round(boxes[ik, 1],1), round(boxes[ik, 2],1), round(boxes[ik, 3], 1)]
-                        box_ = [round(boxes[ik, 0]*o_width/width,1), round(boxes[ik, 1]*o_height/height,1), round(boxes[ik, 2]*o_width/width,1), round(boxes[ik, 3]*o_height/height,1)]
-                        # box_ = [round(box_*o_width/width,1), round(), round(boxes[ik, 2],1), round(boxes[ik, 3], 1)]
-                        box_[2] = round(box_[2] - box_[0], 1)
-                        box_[3] = round(box_[3] - box_[1], 1)
-                        box_ = [float(b) for b in box_]
-                        coco_dets.append({"image_id" : int(coco_image_id), "category_id" : int(cls_id), 
-                                          "bbox" : box_, "score" : float(scores[ik]),
-                                        })
-
-                    cls_dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=True)
-                    det_boxes[cl_ind-1].append(cls_dets)
-                count += 1
-            if print_time and val_itr%val_step == 0:
-                torch.cuda.synchronize()
-                te = time.perf_counter()
-                print('im_detect: {:d}/{:d} time taken {:0.3f}'.format(count, num_images, te-ts))
-                torch.cuda.synchronize()
-                ts = time.perf_counter()
-                print('NMS stuff Time {:0.3f}'.format(ts - tf))
-    
-    # print('Evaluating detections for itration number ', iteration_num)
-    mAP, ap_all, ap_strs , det_boxes = evaluate_detections(gt_boxes, det_boxes, val_dataset.classes, iou_thresh=iou_thresh)
-    
-    for ap_str in ap_strs:
-        print(ap_str)
-        resFile_txt.write(ap_str+'\n')
-    ptr_str = '\nMEANAP:::=>'+str(mAP)+'\n'
-    print(ptr_str)
-    resFile_txt.write(ptr_str)
-    
-    print('saving results :::::')
-    with open(resFile,'w') as f:
-        json.dump(coco_dets, f)
-    
-    cocoDt=cocoGT.loadRes(resFile)
-    # running evaluation
-    cocoEval = COCOeval(cocoGT, cocoDt, 'bbox')
-    # cocoEval.params.imgIds  = imgIds
-    cocoEval.evaluate()
-    cocoEval.accumulate()
-    cocoEval.summarize()
-    
-    resFile_txt.write(ptr_str)
-    # pdb.set_trace()
-    eval_strings = utils.eval_strings()
-    ptr_str = ''
-    for sid, val in enumerate(cocoEval.stats):
-        ptr_str += eval_strings[sid] + str(val) + '\n'
-    print('\n\nPrintning COCOeval Generated results\n\n ')
-    print(ptr_str)
-    resFile_txt.write(ptr_str)
-    return mAP, ap_all, ap_strs , det_boxes
     
 if __name__ == '__main__':
     main()
