@@ -53,10 +53,10 @@ parser.add_argument('--shared_heads', default=0, type=int,help='4 head layers')
 parser.add_argument('--num_head_layers', default=4, type=int,help='0 mean no shareding more than 0 means shareing')
 parser.add_argument('--use_bias', default=True, type=str2bool,help='0 mean no bias in head layears')
 #  Name of the dataset only voc or coco are supported
-parser.add_argument('--dataset', default='coco', help='pretrained base model')
+parser.add_argument('--dataset', default='esad', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment 
 parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
-parser.add_argument('--max_size', default=1000, type=int, help='Input Size for FPN')
+parser.add_argument('--max_size', default=1024, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
@@ -64,11 +64,11 @@ parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of 
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
-parser.add_argument('--max_iter', default=90000, type=int, help='Number of training iterations')
+parser.add_argument('--max_iter', default=6000, type=int, help='Number of training iterations')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
-parser.add_argument('--milestones', default='60000,80000', type=str, help='Chnage the lr @')
+parser.add_argument('--milestones', default='4500,90000', type=str, help='Chnage the lr @')
 parser.add_argument('--gammas', default='0.1,0.1', type=str, help='Gamma update for SGD')
 parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay for SGD')
 
@@ -81,30 +81,28 @@ parser.add_argument('--positive_threshold', default=0.5, type=float, help='Min J
 parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min Jaccard index for matching')
 
 # Evaluation hyperparameters
-parser.add_argument('--intial_val', default=5000, type=int, help='Initial number of training iterations before evaluation')
-parser.add_argument('--val_step', default=25000, type=int, help='Number of training iterations before evaluation')
+parser.add_argument('--intial_val', default=500, type=int, help='Initial number of training iterations before evaluation')
+parser.add_argument('--val_step', default=500, type=int, help='Number of training iterations before evaluation')
 parser.add_argument('--iou_thresh', default=0.25, type=float, help='Evaluation threshold')
-parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
+parser.add_argument('--conf_thresh', default=0.01, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
 parser.add_argument('--topk', default=100, type=int, help='topk for evaluation')
 
 # Progress logging
-parser.add_argument('--log_start', default=149, type=int, help='start loging after k steps for text/Visdom/tensorboard') # Let initial ripples settle down
-parser.add_argument('--log_step', default=10, type=int, help='Log every k steps for text/Visdom/tensorboard')
-parser.add_argument('--tensorboard', default=False, type=str2bool, help='Use tensorboard for loss/evalaution visualization')
-parser.add_argument('--visdom', default=False, type=str2bool, help='Use visdom for loss/evalaution visualization')
-parser.add_argument('--vis_port', default=8093, type=int, help='Port for Visdom Server')
+parser.add_argument('--log_start', default=10, type=int, help='start loging after k steps for text/tensorboard') # Let initial ripples settle down
+parser.add_argument('--log_step', default=1, type=int, help='Log every k steps for text/tensorboard')
+parser.add_argument('--tensorboard', default=True, type=str2bool, help='Use tensorboard for loss/evalaution visualization')
 
 # Program arguments
-parser.add_argument('--man_seed', default=123, type=int, help='manualseed for reproduction')
+parser.add_argument('--man_seed', default=1234, type=int, help='manualseed for reproduction')
 parser.add_argument('--multi_gpu', default=True, type=str2bool, help='If  more than 0 then use all visible GPUs by default only one GPU used ') 
 
 # Use CUDA_VISIBLE_DEVICES=0,1,4,6 to select GPUs to use
-parser.add_argument('--data_root', default='/mnt/sun-beta/saras_data/MIDL_dataset/', help='Location to root directory fo dataset') # /mnt/mars-fast/datasets/
-parser.add_argument('--save_root', default='/mnt/sun-beta/vivek/MIDLbaseline', help='Location to save checkpoint models') # /mnt/sun-gamma/datasets/
-parser.add_argument('--model_dir', default='/mnt/sun-beta/vivek/weights/', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
-
-
+parser.add_argument('--data_root', default='/mnt/mercury-fast/datasets/', help='Location to root directory fo dataset') # /mnt/mars-fast/datasets/
+parser.add_argument('--save_root', default='/mnt/mercury-alpha/', help='Location to save checkpoint models') # /mnt/sun-gamma/datasets/
+# parser.add_argument('--model_dir', default='/mnt/sun-beta/vivek/weights/', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
+parser.add_argument('--model_dir', default='/mnt/mars-gamma/global-models/pytorch-imagenet/', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
+# args.model_dir = ''
 ## Parse arguments
 args = parser.parse_args()
 
@@ -124,30 +122,30 @@ def main():
     
     args.exp_name = utils.create_exp_name(args)
     args.save_root += args.dataset+'/'
+    args.data_root += args.dataset+'/'
     args.save_root = args.save_root+'cache/'+args.exp_name+'/'
 
     if not os.path.isdir(args.save_root): #if save directory doesn't exist create it
         os.makedirs(args.save_root)
 
     source_dir = args.save_root+'/source/' # where to save the source
-    utils.copy_source(source_dir)
+    utils.copy_source(source_dir) # make a copy of source files used for training as a snapshot
 
     print('\nLoading Datasets')
-    # ,
+
     train_transform = transforms.Compose([
-                        #transforms.ColorJitter(brightness=0.10, contrast=0.10, saturation=0.10, hue=0.05),
                         Resize(args.min_size, args.max_size),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means, std=args.stds)])
 
-    train_dataset = DetectionDataset(root= args.data_root, train=True, image_sets='train', transform=train_transform)
+    train_dataset = DetectionDataset(root= args.data_root, train=True, input_sets=['train/set1','train/set2'], transform=train_transform)
     print('Done Loading Dataset Train Dataset :::>>>\n',train_dataset.print_str)
     val_transform = transforms.Compose([ 
                         Resize(args.min_size, args.max_size),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
                         
-    val_dataset = DetectionDataset(root= args.data_root, train=False, image_sets='val', transform=val_transform, full_test=False)
+    val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=False)
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
     
     args.num_classes = len(train_dataset.classes) + 1
@@ -189,7 +187,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     # anchors = anchors.cuda(0, non_blocking=True)
     if args.tensorboard:
         log_dir = args.save_root+'tensorboard-{date:%m-%d-%Hx}.log'.format(date=datetime.datetime.now())
-        sw = SummaryWriter(log_dir=log_dir)
+        sw = SummaryWriter(log_dir)
     log_file = open(args.save_root+'training.text{date:%m-%d-%Hx}.txt'.format(date=datetime.datetime.now()), 'w', 1)
     log_file.write(args.exp_name+'\n')
 
@@ -217,37 +215,6 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     epoch_size = len(train_dataset) // args.batch_size
 #    print('Training FPN on ', train_dataset.dataset,'\n')
 
-    if args.visdom:
-        import visdom
-        viz = visdom.Visdom(env=args.exp_name, port=args.vis_port)
-        # initialize visdom loss plot
-        lot = viz.line(
-            X=torch.zeros((1,)).cpu(),
-            Y=torch.zeros((1, 6)).cpu(),
-            opts=dict(
-                xlabel='Iteration',
-                ylabel='Loss',
-                title='Training Loss',
-                legend=['REG', 'CLS', 'AVG', 'S-REG', ' S-CLS', ' S-AVG']
-            )
-        )
-        # initialize visdom meanAP and class APs plot
-        legends = ['meanAP']
-        for cls_ in args.classes:
-            legends.append(cls_)
-        print(legends)
-        val_lot = viz.line(
-            X=torch.zeros((1,)).cpu(),
-            Y=torch.zeros((1, args.num_classes)).cpu(),
-            opts=dict(
-                xlabel='Iteration',
-                ylabel='AP %',
-                title='Validation APs and mAP',
-                legend=legends
-            )
-        )
-
-
 
     train_data_loader = data_utils.DataLoader(train_dataset, args.batch_size, num_workers=args.num_workers,
                                   shuffle=True, pin_memory=True, collate_fn=custum_collate, drop_last=True)
@@ -263,9 +230,10 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     num_bpe = len(train_data_loader)
     while iteration <= args.max_iter:
         for i, (images, gts, counts, _, _) in enumerate(train_data_loader):
-            if iteration > args.max_iter:
+            if iteration >= args.max_iter:
                 break
             iteration += 1
+            
 #            pdb.set_trace()
             epoch = int(iteration/num_bpe)
             images = images.cuda(0, non_blocking=True)
@@ -312,12 +280,6 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             start = time.perf_counter()
 
             if iteration % args.log_step == 0 and iteration > args.log_start:
-                if args.visdom:
-                    losses_list = [loc_losses.val, cls_losses.val, losses.val, loc_losses.avg, cls_losses.avg, losses.avg]
-                    viz.line(X=torch.ones((1, 6)).cpu() * iteration,
-                        Y=torch.from_numpy(np.asarray(losses_list)).unsqueeze(0).cpu(),
-                        win=lot,
-                        update='append')
                 if args.tensorboard:
                     sw.add_scalars('Classification', {'val': cls_losses.val, 'avg':cls_losses.avg},iteration)
                     sw.add_scalars('Localisation', {'val': loc_losses.val, 'avg':loc_losses.avg},iteration)
@@ -365,17 +327,6 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                         class_AP_group[args.classes[c]] = ap
                     sw.add_scalars('ClassAPs', class_AP_group, iteration)
 
-                if args.visdom:
-                    aps = [mAP]
-                    for ap in ap_all:
-                        aps.append(ap)
-                    viz.line(
-                        X=torch.ones((1, args.num_classes)).cpu() * iteration,
-                        Y=torch.from_numpy(np.asarray(aps)).unsqueeze(0).cpu(),
-                        win=val_lot,
-                        update='append'
-                            )
-
                 torch.cuda.synchronize()
                 t0 = time.perf_counter()
                 prt_str = '\nValidation TIME::: {:0.3f}\n\n'.format(t0-tvs)
@@ -401,6 +352,8 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, iou_thresh
     activation = nn.Sigmoid().cuda()
     if args.loss_type == 'mbox':
         activation = nn.Softmax(dim=2).cuda()
+
+    dict_for_json_dump = {}
 
     with torch.no_grad():
         for val_itr, (images, targets, batch_counts, img_indexs, wh) in enumerate(val_data_loader):

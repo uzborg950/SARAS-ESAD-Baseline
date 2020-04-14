@@ -76,10 +76,8 @@ parser.add_argument('--topk', default=100, type=int, help='topk for evaluation')
 
 # Progress logging
 parser.add_argument('--log_iters', default=True, type=str2bool, help='Print the loss at each iteration')
-parser.add_argument('--log_step', default=10, type=int, help='Log after k steps for text/Visdom/tensorboard')
+parser.add_argument('--log_step', default=10, type=int, help='Log after k steps for text/tensorboard')
 parser.add_argument('--tensorboard', default=False, type=str2bool, help='Use tensorboard for loss/evalaution visualization')
-parser.add_argument('--visdom', default=False, type=str2bool, help='Use visdom for loss/evalaution visualization')
-parser.add_argument('--vis_port', default=8098, type=int, help='Port for Visdom Server')
 
 # Program arguments
 parser.add_argument('--man_seed', default=1, type=int, help='manualseed for reproduction')

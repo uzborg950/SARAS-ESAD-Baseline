@@ -52,10 +52,10 @@ class Resize(object):
 
             if w < h:
                 ow = size
-                oh = int(size * h / w)
+                oh = int(round(size * h / w))
             else:
                 oh = size
-                ow = int(size * w / h)
+                ow = int(round(size * w / h))
 
             return (oh, ow)
 

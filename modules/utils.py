@@ -32,13 +32,6 @@ def set_args(args, iftest='train'):
     args.dataset = args.dataset.lower()
     args.basenet = args.basenet.lower()
 
-    if args.dataset == 'coco':
-        args.train_sets = ['train2017']
-        args.val_sets = ['val2017']
-    else:
-        args.train_sets = ['train2007', 'val2007', 'train2012', 'val2012']
-        args.val_sets = ['test2007']
-
     args.means =[0.485, 0.456, 0.406]
     args.stds = [0.229, 0.224, 0.225]
 
@@ -46,31 +39,6 @@ def set_args(args, iftest='train'):
     hostname = socket.gethostname()
     args.hostname = hostname
     args.user = username
-
-    print('\n\n ', username, ' is using ', hostname, '\n\n')
-    if username == 'gurkirt':
-        args.model_dir = '/mnt/mars-gamma/global-models/pytorch-imagenet/'
-        if hostname == 'mars':
-            args.data_root = '/mnt/mars-fast/datasets/'
-            args.save_root = '/mnt/venus-alpha/'
-            args.vis_port = 8097
-        elif hostname == 'venus':
-            args.data_root = '/mnt/venus-fast/datasets/'
-            args.save_root = '/mnt/venus-alpha/'
-            args.vis_port = 8095
-        elif hostname in ['sun','jupiter']:
-            args.data_root = '/mnt/mercury-fast/datasets/'
-            args.save_root = '/mnt/mars-gamma/'
-            if hostname in ['sun']:
-                args.vis_port = 8096
-            else:
-                args.vis_port = 8095
-        elif hostname == 'mercury':
-            args.data_root = '/mnt/mercury-fast/datasets/'
-            args.save_root = '/mnt/venus-alpha/'
-            args.vis_port = 8098
-        else:
-            raise('ERROR!!!!!!!! Specify directories')
     
     print('Your working directories are', args.data_root, args.save_root)
     return args
