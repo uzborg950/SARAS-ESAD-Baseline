@@ -124,11 +124,12 @@ class DetectionDataset(data.Dataset):
         img = Image.open(img_path).convert('RGB')
         orig_w, orig_h = img.size
         
-        if self.train and np.random.random() < 0.5:
-            img = img.transpose(Image.FLIP_LEFT_RIGHT)
-            w = boxes[:, 2] - boxes[:, 0]
-            boxes[:, 0] = 1 - boxes[:, 2] # boxes should be in x1 y1 x2 y2 [0,1] format 
-            boxes[:, 2] = boxes[:, 0] + w # boxes should be in x1 y1 x2 y2 [0,1] format
+        ## Horizontal flip is turned off because some catories are sentive to the flip.
+        # if self.train and np.random.random() < 0.5:
+        #     img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        #     w = boxes[:, 2] - boxes[:, 0]
+        #     boxes[:, 0] = 1 - boxes[:, 2] # boxes should be in x1 y1 x2 y2 [0,1] format 
+        #     boxes[:, 2] = boxes[:, 0] + w # boxes should be in x1 y1 x2 y2 [0,1] format
         
         if self.transform is not None:
             img = self.transform(img)

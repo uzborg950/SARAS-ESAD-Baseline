@@ -48,7 +48,7 @@ parser.add_argument('--use_bias', default=True, type=str2bool,help='0 mean no bi
 parser.add_argument('--dataset', default='esad', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment 
 parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
-parser.add_argument('--max_size', default=1024, type=int, help='Input Size for FPN')
+parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
