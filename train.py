@@ -2,6 +2,9 @@
 
     Author: Vivek Singh and Gurkirt Singh 
     Parts of this files are from many github repos
+
+    @gurkirt mostly from https://github.com/gurkirt/RetinaNet.pytorch.1.x
+
     @longcw faster_rcnn_pytorch: https://github.com/longcw/faster_rcnn_pytorch
     @rbgirshick py-faster-rcnn https://github.com/rbgirshick/py-faster-rcnn
     Which was adopated by: Ellis Brown, Max deGroot
