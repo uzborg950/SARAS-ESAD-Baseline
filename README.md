@@ -98,13 +98,15 @@ This will dump a log file with **results(mAP)** on validation set and as well as
 ## Results
 Here are the results on `esad` dataset.
 
-Loss   |depth | width | height | AP_10    | AP_30   |  AP_50   | AP_MEAN  |   
-|----- |----- |:----: |:------:| :------: | :------:| :------: | :------: |
-| Focal| 50   |  1024 | 576    | 35.4     | 21.8    | **10.9** | **17.2** |  
-| OHEM | 50   |  1024 | 576    | **37.4** | **23.7**| 10.7     | 16.4 |
+Loss   |depth | min dim  | AP_10    | AP_30   |  AP_50   | AP_MEAN  |   
+|----- |----- |:-------: |:--------:| :-----: | :-------:| :------: |
+| Focal| 50   |  600     | 35.4     | 21.8    | **10.9** | **17.2** |  
+| OHEM | 50   |  600     | **37.4** | **23.7**| 10.7     | 16.4     |
+| Focal| 50   |  800     | 35.4     | 21.8    | **10.9** | **17.2** |  
+| OHEM | 50   |  800     | **37.4** | **23.7**| 10.7     | 16.4     |
 
 ## Details
-- Input image size is `576x1024`.
+- Input image size (`height x width`)is `600x1067` or `800x1422`.
 - Batch size is set to `16`, the learning rate of `0.01`.
 - Weights for initial layers are frozen see `freezeupto` flag in `train.py`
 - max number of iterations is set to 6000

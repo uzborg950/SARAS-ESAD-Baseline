@@ -81,7 +81,7 @@ class MultiBoxLoss(nn.Module):
         predicted_locations = predicted_locations[pos_mask, :].reshape(-1, 4)
         gt_locations = gt_locations[pos_mask, :].reshape(-1, 4)
         
-        localisation_loss = smooth_l1_loss(predicted_locations, gt_locations, reduction='sum')/(num_pos * 4.0)
+        localisation_loss = F.smooth_l1_loss(predicted_locations, gt_locations, reduction='sum')/(num_pos * 4.0)
         
         return localisation_loss, classification_loss
 

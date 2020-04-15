@@ -59,7 +59,7 @@ parser.add_argument('--use_bias', default=True, type=str2bool,help='0 mean no bi
 parser.add_argument('--dataset', default='esad', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment 
 parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
-parser.add_argument('--max_size', default=1024, type=int, help='Input Size for FPN')
+parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
@@ -67,11 +67,11 @@ parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of 
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
-parser.add_argument('--max_iter', default=6000, type=int, help='Number of training iterations')
+parser.add_argument('--max_iter', default=7500, type=int, help='Number of training iterations')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
-parser.add_argument('--milestones', default='4500,90000', type=str, help='Chnage the lr @')
+parser.add_argument('--milestones', default='5000,7000', type=str, help='Chnage the lr @')
 parser.add_argument('--gammas', default='0.1,0.1', type=str, help='Gamma update for SGD')
 parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay for SGD')
 
@@ -97,7 +97,7 @@ parser.add_argument('--log_step', default=1, type=int, help='Log every k steps f
 parser.add_argument('--tensorboard', default=True, type=str2bool, help='Use tensorboard for loss/evalaution visualization')
 
 # Program arguments
-parser.add_argument('--man_seed', default=1234, type=int, help='manualseed for reproduction')
+parser.add_argument('--man_seed', default=123, type=int, help='manualseed for reproduction')
 parser.add_argument('--multi_gpu', default=True, type=str2bool, help='If  more than 0 then use all visible GPUs by default only one GPU used ') 
 
 # Use CUDA_VISIBLE_DEVICES=0,1,4,6 to select GPUs to use

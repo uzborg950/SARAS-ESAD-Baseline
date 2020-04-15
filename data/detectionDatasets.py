@@ -116,19 +116,19 @@ class DetectionDataset(data.Dataset):
         y1= bbox_info[:,1] - bbox_info[:,3]/2
         x2= bbox_info[:,0] + bbox_info[:,2]/2
         y2= bbox_info[:,1] + bbox_info[:,3]/2
+
         boxes= np.hstack([np.expand_dims(x1, axis=1), np.expand_dims(y1, axis=1),
                           np.expand_dims(x2, axis=1), np.expand_dims(y2, axis=1)])
         # Box coordinates should be in ranges of [0,1]
 
         img = Image.open(img_path).convert('RGB')
         orig_w, orig_h = img.size
-
-#        print(img.size)
-#        if self.train and np.random.random() < 0.5:
-#            img = img.transpose(Image.FLIP_LEFT_RIGHT)
-#            w = boxes[:, 2] - boxes[:, 0]
-#            boxes[:, 0] = 1 - boxes[:, 2] # boxes should be in x1 y1 x2 y2 [0,1] format 
-#            boxes[:, 2] = boxes[:, 0] + w # boxes should be in x1 y1 x2 y2 [0,1] format
+        
+        if self.train and np.random.random() < 0.5:
+            img = img.transpose(Image.FLIP_LEFT_RIGHT)
+            w = boxes[:, 2] - boxes[:, 0]
+            boxes[:, 0] = 1 - boxes[:, 2] # boxes should be in x1 y1 x2 y2 [0,1] format 
+            boxes[:, 2] = boxes[:, 0] + w # boxes should be in x1 y1 x2 y2 [0,1] format
         
         if self.transform is not None:
             img = self.transform(img)
@@ -136,7 +136,7 @@ class DetectionDataset(data.Dataset):
         _, height, width = img.shape
 
         wh = [width, height, orig_w, orig_h]
-
+        # print(wh)
         boxes[:, 0] *= width # width x1
         boxes[:, 2] *= width # width x2
         boxes[:, 1] *= height # height y1
