@@ -39,7 +39,7 @@ You will need the following to run this code successfully
 - Pytorch latest
 - Visualisation 
   - if you want to visualise set tensorboard flag equal to true while training
-  - [TensorboadX](https://github.com/lanpa/tensorboardX)
+  - [TensorboardX](https://github.com/lanpa/tensorboardX)
   - Tensorflow for tensorboard
 
 
@@ -50,11 +50,15 @@ You will need the following to run this code successfully
 - Your directory will look like
   - esad
     - train
-      - files
-      - ..
+      - set1
+        - file.txt
+	- file.jpg
+        - ..
     - val
-      - files
-      - ..
+      - obj
+        - file.txt
+	- file.jpg
+        - ..
 
 - Now your dataset is ready, that is time to download imagenet pretrained weights for ResNet backbone models. 
 - Weights are initialised with imagenet pretrained models, specify the path of pre-saved models, `model_dir` in `train.py`. Download them from [torchvision models](https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py). After you have download weights, please rename then appropriately under `model_dir` e.g. resnet50 resen101 etc. from This is a requirement of the training process. 
