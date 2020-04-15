@@ -52,12 +52,12 @@ You will need the following to run this code successfully
     - train
       - set1
         - file.txt
-	- file.jpg
+        - file.jpg
         - ..
     - val
       - obj
         - file.txt
-	- file.jpg
+        - file.jpg
         - ..
 
 - Now your dataset is ready, that is time to download imagenet pretrained weights for ResNet backbone models. 
