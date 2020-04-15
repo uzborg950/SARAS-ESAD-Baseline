@@ -15,7 +15,7 @@ The code is adopated from [RetinaNet implementation in pytorch.1.x](https://gith
 
 Here, we implement basic data-handling tools for [SARAS-ESAD](https://saras-esad.grand-challenge.org/Dataset/) dataset with FPN training process. We implement a pure pytorch code for train FPN with [Focal-Loss](https://arxiv.org/pdf/1708.02002.pdf) or [OHEM/multi-box-loss](https://arxiv.org/pdf/1512.02325.pdf) paper. Aim of this repository try different loss functions and make a fair comparison in terms of performance on SARAR-ESAD dataset.
 
-We hope this will help kick start more teams to get up to the speed and allow the time for more innovative solutions. We want to eleminate the pain of building data handling and training process from scratch. Our final aim is to get this repository the level of [realtime-action-detection](https://github.com/gurkirt/realtime-action-detection).
+We hope this will help kick start more teams to get up to the speed and allow the time for more innovative solutions. We want to eliminate the pain of building data handling and training process from scratch. Our final aim is to get this repository the level of [realtime-action-detection](https://github.com/gurkirt/realtime-action-detection).
 
 At the moment we support the latest pytorch and ubuntu with Anaconda distribution of python. Tested on a single machine with 2/4/8 GPUs.
 
@@ -29,7 +29,7 @@ Similar to the original paper, we freeze the batch normalisation layers of ResNe
 ## Loss functions 
 - OHEM with multi-box loss function: We use multi-box loss function with online hard example mining (OHEM), similar to [SSD](https://arxiv.org/pdf/1512.02325.pdf). A huge thanks to Max DeGroot, Ellis Brown for [Pytorch implementation](https://github.com/amdegroot/ssd.pytorch) of SSD and loss function.
 
-- Focal loss: Same as in the original paper we use sigmoid focal loss, see [RetnaNet](https://arxiv.org/pdf/1708.02002.pdf). We use pure pytorch implementation of it.
+- Focal loss: Same as in the original paper we use sigmoid focal loss, see [RetinaNet](https://arxiv.org/pdf/1708.02002.pdf). We use pure pytorch implementation of it.
 
 - Yolo Loss: Multi-part loss function from [YOLO](https://pjreddie.com/darknet/yolo/) is also implemented here.
 
@@ -110,7 +110,7 @@ Loss   |depth | min dim  | AP_10    | AP_30   |  AP_50   | AP_MEAN  |
 - Batch size is set to `16`, the learning rate of `0.01`.
 - Weights for initial layers are frozen see `freezeupto` flag in `train.py`
 - max number of iterations is set to 6000
-- SGD is used for optimisation
+- SGD is used for the optimisation
 - initial learning rate is set to `0.01`
 - learning rate is dropped by the factor of 10 after 4500 iterations
 - Different training setting might result in better/same/worse performance
