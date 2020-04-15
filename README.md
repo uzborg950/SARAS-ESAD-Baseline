@@ -8,18 +8,18 @@ The code is adopated from [RetinaNet implementation in pytorch.1.x](https://gith
 - Data preparation instructions for SARAS-ESAD 2020 challenge
 - Dataloader for SARAS-ESAD dataset
 - Pytorch1.X implementation
-- Feature pyramid network (FPN) archtecture with different ResNet backbones
+- Feature pyramid network (FPN) architecture with different ResNet backbones
 - Three types of loss functions i.e OHEM Loss, Focal Loss, and YOLO Loss on top of FPN
 
 ## Introduction
 
 Here, we implement basic data-handling tools for [SARAS-ESAD](https://saras-esad.grand-challenge.org/Dataset/) dataset with FPN training process. We implement a pure pytorch code for train FPN with [Focal-Loss](https://arxiv.org/pdf/1708.02002.pdf) or [OHEM/multi-box-loss](https://arxiv.org/pdf/1512.02325.pdf) paper. Aim of this repository try different loss functions and make a fair comparison in terms of performance on SARAR-ESAD dataset.
 
-We hope this will help kick start more teams to get upto the speed and allow the time for more invoative solutions. We want to eleminate the pain of building data handling and training process from scratch. Our final aim is to get this repository the level of [realtime-action-detection](https://github.com/gurkirt/realtime-action-detection).
+We hope this will help kick start more teams to get up to the speed and allow the time for more innovative solutions. We want to eleminate the pain of building data handling and training process from scratch. Our final aim is to get this repository the level of [realtime-action-detection](https://github.com/gurkirt/realtime-action-detection).
 
-At the moment we support latest pytorch and ubuntu with Anaconda distribution of python. Tested on a single machine with 2/4/8 GPUs.
+At the moment we support the latest pytorch and ubuntu with Anaconda distribution of python. Tested on a single machine with 2/4/8 GPUs.
 
-You can found out about architecture and loss function on parent reportory, i.e. [RetinaNet implementation in pytorch.1.x](https://github.com/gurkirt/RetinaNet.pytorch.1.x).
+You can found out about architecture and loss function on parent repository, i.e. [RetinaNet implementation in pytorch.1.x](https://github.com/gurkirt/RetinaNet.pytorch.1.x).
 
 ResNet is used as a backbone network (a) to build the pyramid features (b). 
 Each classification (c) and regression (d) subnet is made of 4 convolutional layers and finally a convolutional layer to predict the class scores and bounding box coordinated respectively.
@@ -37,16 +37,16 @@ Similar to the original paper, we freeze the batch normalisation layers of ResNe
 You will need the following to run this code successfully
 - Anaconda python
 - Pytorch latest
-- Visulisation 
-  - if you want to visulise set tensorboard flag equal to true while training
+- Visualisation 
+  - if you want to visualise set tensorboard flag equal to true while training
   - [TensorboadX](https://github.com/lanpa/tensorboardX)
-  - Tensorflow for tensorboad
+  - Tensorflow for tensorboard
 
 
 ### Datasets and other downloads
 - Please visit [SARAS-ESAD](https://saras-esad.grand-challenge.org) website to download the dataset for surgeon action detection. 
-- Extract all the sets (train and val) from zip files and put them under single directory. Provide the path of that directory as data_root in train file. Data prepocessing and feeding pipeline is in [detectionDatasets.py](https://github.com/Viveksbawa/SARAS-ESAD-baseline/blob/master/data/detectionDatasets.py) file.
-- rename the data dirctory `esad`. 
+- Extract all the sets (train and val) from zip files and put them under a single directory. Provide the path of that directory as data_root in train file. Data preprocessing and feeding pipeline is in [detectionDatasets.py](https://github.com/Viveksbawa/SARAS-ESAD-baseline/blob/master/data/detectionDatasets.py) file.
+- rename the data directory `esad`. 
 - Your directory will look like
   - esad
     - train
@@ -57,15 +57,15 @@ You will need the following to run this code successfully
       - ..
 
 - Now your dataset is ready, that is time to download imagenet pretrained weights for ResNet backbone models. 
-- Weights are initialised with imagenet pretrained models, specify the path of pre-saved models, `model_dir` in `train.py`. Download them from [torchvision models](https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py). After you have download weights, please rename then aprropiratley under `model_dir` e.g. resnet50 resen101 etc. from This is a requirement of training process. 
+- Weights are initialised with imagenet pretrained models, specify the path of pre-saved models, `model_dir` in `train.py`. Download them from [torchvision models](https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py). After you have download weights, please rename then appropriately under `model_dir` e.g. resnet50 resen101 etc. from This is a requirement of the training process. 
 
 ## TRAINING
 
 Once you have pre-processed the dataset, then you are ready to train your networks.
-We must have following arguments set correctly:
-- `data_root` is base path upto `esad` dirotory e.g. `\home\gurkirt\`
-- `save_root` is base path where you want to store the checkpoints, training logs, tensoboard logs etc.
-- `model_dir` is path where ResNet backbone model weights are stored
+We must have the following arguments set correctly:
+- `data_root` is base path upto `esad` directory e.g. `\home\gurkirt\`
+- `save_root` is a base path where you want to store the checkpoints, training logs, tensorboard logs etc.
+- `model_dir` is a path where ResNet backbone model weights are stored
 
 To train run the following command. 
 
@@ -78,22 +78,22 @@ You can append `CUDA_VISIBLE_DEVICES=<gpuids-comma-separated>` at the beginning 
 
 Please check the arguments in `train.py` to adjust the training process to your liking.
 
-### Some usefull flags
+### Some useful flags
 - 
 
 ## Evaluation
 Model is evaluated and saved after each `1000` iterations. 
 
-mAP@0.25 is computed after every `500` iterations and at the end. You can chnage to your liking by specify it in `train.py` arguments.
+mAP@0.25 is computed after every `500` iterations and at the end. You can change to your liking by specify it in `train.py` arguments.
 
-You can evaluate and save the results in json file using `evaluate.py`. It follow the same aruments `train.py`.
-By default it evaluate using the model store at `max_iters`, but you can chnage it any other snapshot/checkpoint.
+You can evaluate and save the results in `text` file using `evaluate.py`. It follow the same arguments `train.py`.
+By default it evaluate using the model store at `max_iters`, but you can change it any other snapshot/checkpoint.
 
 ```
 python evaluate.py --loss_type=focal
 ```
 
-This will dump a log file with **results(mAP)** on validation set and as well as a **submission file**.
+This will dump a log file with **results(mAP)** on the validation set and as well as a **submission file**.
 
 ## Results
 Here are the results on `esad` dataset.
