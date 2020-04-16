@@ -110,7 +110,8 @@ def main():
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
 
-    val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=False)
+    # val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=False)
+    val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['test/obj'], transform=val_transform, full_test=True)
 
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
 

@@ -20,13 +20,22 @@ from PIL import Image, ImageDraw
 import glob
 import pdb
 
-def read_file(path):
+def read_file(path, full_test):
     with open(path, 'r') as f:
         lines = f.readlines()
     
+    if not lines and full_test:
+        # in case we are testing and we don't have labels
+        # but we need to return at least one label per image
+        # we fake it like belwo
+        return [[0.25, 0.25, 0.75, 0.75, -1]]
+
     if not lines: 
+        # during training or validation we return None as labels so we can skip the image
         return None
     
+    
+    # during training or validation we return the labels
     lines = [line.split(' ') for line in lines if len(line)>0]
 
     out_data = []
@@ -37,32 +46,32 @@ def read_file(path):
     
     return out_data
 
-def read_labels(data_files):
+def read_labels(image_files, full_test):
     labels=[]
     
-    for txt_file in data_files:
-        label= read_file(txt_file)
+    for img_path in image_files:
+        label_file = img_path.replace('.jpg', '.txt')
+        label= read_file(label_file, full_test)
         if label is not None:
-            img_path= txt_file.replace('.txt', '.jpg')
             labels.append([img_path, label])
     
     return labels
 
 
-def read_train(path, input_sets=['train/set1','train/set2']):
+def read_sets(path, input_sets=['train/set1','train/set2'], full_test=False):
     
     all_files=[]
     for set_name in input_sets:
         set_path= path + set_name
-        data_files= glob.glob(set_path+'/*.txt')
-        all_files.extend(data_files)
+        image_files= glob.glob(set_path+'/*.jpg')
+        all_files.extend(image_files)
         
-    labels= read_labels(all_files)
+    labels= read_labels(all_files, full_test)
 
     return(labels)
     
             
-def make_object_lists(rootpath, input_sets=['train/set1','train/set2']):
+def make_object_lists(rootpath, input_sets=['train/set1','train/set2'], full_test=False):
     '''
 
     input_sets has be a list of set needs tobe read : 
@@ -76,7 +85,7 @@ def make_object_lists(rootpath, input_sets=['train/set1','train/set2']):
 
     cls_list = [name for name in cls_list if len(name)>0]
     
-    final_labels= read_train(rootpath, input_sets)
+    final_labels= read_sets(rootpath, input_sets, full_test)
         
     return(cls_list, final_labels)
 
@@ -97,7 +106,7 @@ class DetectionDataset(data.Dataset):
         self.transform = transform
         self.anno_transform = anno_transform
         self.ids = list()
-        self.classes, self.ids = make_object_lists(self.root, input_sets=input_sets)
+        self.classes, self.ids = make_object_lists(self.root, input_sets=input_sets, full_test=full_test)
         self.print_str= ''
         self.max_targets = 20
         

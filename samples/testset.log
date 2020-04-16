@@ -1,0 +1,669 @@
+FPN800x1440-0-esad-resnet50-hl4s0-bn1f1b1-bs16-SGD-lr010000-mbox
+/mnt/mercury-alpha/esad/cache/FPN800x1440-0-esad-resnet50-hl4s0-bn1f1b1-bs16-SGD-lr010000-mbox/model_006000.pth
+Testing net 
+
+
+IOU Threshold: 0.05:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.076505940867643
+PullingVasDeferens : 113.0 : 247 : 0.13968878906146953
+ClippingVasDeferens : 48.0 : 21 : 0.034722222222222224
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.3449687198313423
+PullingSeminalVesicle : 436.0 : 885 : 0.07906419371826832
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.08578779294895178
+SuckingBlood : 1696.0 : 4650 : 0.592377913475368
+SuckingSmoke : 771.0 : 1299 : 0.14836011987986597
+PullingTissue : 2024.0 : 11235 : 0.3818600204713837
+CuttingTissue : 2055.0 : 4763 : 0.44615114322809635
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.037317486772579546
+BladderAnastomosis : 1828.0 : 10618 : 0.6762890453043682
+PullingProstate : 451.0 : 2670 : 0.09745307513177406
+ClippingBladderNeck : 18.0 : 157 : 0.04087301587301588
+CuttingThread : 40.0 : 323 : 0.1208021978021978
+UrethraDissection : 439.0 : 1007 : 0.12396219041441664
+CuttingProstate : 48.0 : 1988 : 0.017112674043371124
+PullingBladderNeck : 105.0 : 2473 : 5.1666236114699044e-05
+
+MEANAP:::=>16.3969
+
+
+
+IOU Threshold: 0.10:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.076505940867643
+PullingVasDeferens : 113.0 : 247 : 0.13968878906146953
+ClippingVasDeferens : 48.0 : 21 : 0.034722222222222224
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.3449687198313423
+PullingSeminalVesicle : 436.0 : 885 : 0.0761964955730446
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.08578779294895178
+SuckingBlood : 1696.0 : 4650 : 0.591367379744596
+SuckingSmoke : 771.0 : 1299 : 0.14465522919185106
+PullingTissue : 2024.0 : 11235 : 0.3791390030347995
+CuttingTissue : 2055.0 : 4763 : 0.44451098992843935
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.03680035421476572
+BladderAnastomosis : 1828.0 : 10618 : 0.6634599882054855
+PullingProstate : 451.0 : 2670 : 0.09415575402386711
+ClippingBladderNeck : 18.0 : 157 : 0.04087301587301588
+CuttingThread : 40.0 : 323 : 0.1208021978021978
+UrethraDissection : 439.0 : 1007 : 0.12064077162651374
+CuttingProstate : 48.0 : 1988 : 0.017112674043371124
+PullingBladderNeck : 105.0 : 2473 : 5.1666236114699044e-05
+
+MEANAP:::=>16.2449
+
+
+
+IOU Threshold: 0.15:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.076505940867643
+PullingVasDeferens : 113.0 : 247 : 0.1376127224299384
+ClippingVasDeferens : 48.0 : 21 : 0.034722222222222224
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.3449687198313423
+PullingSeminalVesicle : 436.0 : 885 : 0.07585142813913702
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.08578779294895178
+SuckingBlood : 1696.0 : 4650 : 0.5854552338422438
+SuckingSmoke : 771.0 : 1299 : 0.14388807928124944
+PullingTissue : 2024.0 : 11235 : 0.3761817470154978
+CuttingTissue : 2055.0 : 4763 : 0.4421176441804723
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.03680035421476572
+BladderAnastomosis : 1828.0 : 10618 : 0.5677129094214076
+PullingProstate : 451.0 : 2670 : 0.09009914607160371
+ClippingBladderNeck : 18.0 : 157 : 0.04087301587301588
+CuttingThread : 40.0 : 323 : 0.1208021978021978
+UrethraDissection : 439.0 : 1007 : 0.12064077162651374
+CuttingProstate : 48.0 : 1988 : 0.017112674043371124
+PullingBladderNeck : 105.0 : 2473 : 5.1666236114699044e-05
+
+MEANAP:::=>15.7009
+
+
+
+IOU Threshold: 0.20:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.076505940867643
+PullingVasDeferens : 113.0 : 247 : 0.13568068545286813
+ClippingVasDeferens : 48.0 : 21 : 0.034722222222222224
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.3449687198313423
+PullingSeminalVesicle : 436.0 : 885 : 0.07498295558615475
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.08272217951192734
+SuckingBlood : 1696.0 : 4650 : 0.5731528763538453
+SuckingSmoke : 771.0 : 1299 : 0.14152160968780667
+PullingTissue : 2024.0 : 11235 : 0.3720404308456675
+CuttingTissue : 2055.0 : 4763 : 0.4344474199197051
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.03583860609943819
+BladderAnastomosis : 1828.0 : 10618 : 0.48192249786432817
+PullingProstate : 451.0 : 2670 : 0.08403597395063198
+ClippingBladderNeck : 18.0 : 157 : 0.04087301587301588
+CuttingThread : 40.0 : 323 : 0.11805952380952381
+UrethraDissection : 439.0 : 1007 : 0.11686169990408221
+CuttingProstate : 48.0 : 1988 : 0.017112674043371124
+PullingBladderNeck : 105.0 : 2473 : 5.1666236114699044e-05
+
+MEANAP:::=>15.0738
+
+
+
+IOU Threshold: 0.25:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.076505940867643
+PullingVasDeferens : 113.0 : 247 : 0.1258413566733133
+ClippingVasDeferens : 48.0 : 21 : 0.034722222222222224
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.3449687198313423
+PullingSeminalVesicle : 436.0 : 885 : 0.07498295558615475
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.08166859252688634
+SuckingBlood : 1696.0 : 4650 : 0.5523332048300194
+SuckingSmoke : 771.0 : 1299 : 0.139378380934163
+PullingTissue : 2024.0 : 11235 : 0.36139232389086295
+CuttingTissue : 2055.0 : 4763 : 0.42037927991047175
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.034763875188418725
+BladderAnastomosis : 1828.0 : 10618 : 0.39966086302852954
+PullingProstate : 451.0 : 2670 : 0.07578916704309624
+ClippingBladderNeck : 18.0 : 157 : 0.04087301587301588
+CuttingThread : 40.0 : 323 : 0.03480967458684202
+UrethraDissection : 439.0 : 1007 : 0.10637036755310914
+CuttingProstate : 48.0 : 1988 : 0.015627223765365468
+PullingBladderNeck : 105.0 : 2473 : 2.296277160653291e-05
+
+MEANAP:::=>13.9052
+
+
+
+IOU Threshold: 0.30:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.076505940867643
+PullingVasDeferens : 113.0 : 247 : 0.11925171385285943
+ClippingVasDeferens : 48.0 : 21 : 0.034722222222222224
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.3449687198313423
+PullingSeminalVesicle : 436.0 : 885 : 0.07252887946569196
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.06786709326006056
+SuckingBlood : 1696.0 : 4650 : 0.5208964929830335
+SuckingSmoke : 771.0 : 1299 : 0.1338982217890501
+PullingTissue : 2024.0 : 11235 : 0.33955369272102465
+CuttingTissue : 2055.0 : 4763 : 0.39203289855031076
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.031953441194545
+BladderAnastomosis : 1828.0 : 10618 : 0.33520817243426493
+PullingProstate : 451.0 : 2670 : 0.06999573134750064
+ClippingBladderNeck : 18.0 : 157 : 0.04087301587301588
+CuttingThread : 40.0 : 323 : 0.030414539198830182
+UrethraDissection : 439.0 : 1007 : 0.08861691432924844
+CuttingProstate : 48.0 : 1988 : 0.013714985440083661
+PullingBladderNeck : 105.0 : 2473 : 2.296277160653291e-05
+
+MEANAP:::=>12.9192
+
+
+
+IOU Threshold: 0.35:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.07161142987175528
+PullingVasDeferens : 113.0 : 247 : 0.1103547729691511
+ClippingVasDeferens : 48.0 : 21 : 0.034722222222222224
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.32959965911574696
+PullingSeminalVesicle : 436.0 : 885 : 0.0702430267510466
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.06786709326006056
+SuckingBlood : 1696.0 : 4650 : 0.4556216698544028
+SuckingSmoke : 771.0 : 1299 : 0.12207906689571593
+PullingTissue : 2024.0 : 11235 : 0.2994224565636735
+CuttingTissue : 2055.0 : 4763 : 0.34843722739783134
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.031320376034508324
+BladderAnastomosis : 1828.0 : 10618 : 0.25499950541731164
+PullingProstate : 451.0 : 2670 : 0.05894904071361382
+ClippingBladderNeck : 18.0 : 157 : 0.04087301587301588
+CuttingThread : 40.0 : 323 : 0.008684412586317507
+UrethraDissection : 439.0 : 1007 : 0.08167784824177075
+CuttingProstate : 48.0 : 1988 : 0.013299828435252743
+PullingBladderNeck : 105.0 : 2473 : 2.296277160653291e-05
+
+MEANAP:::=>11.4276
+
+
+
+IOU Threshold: 0.40:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.07161142987175528
+PullingVasDeferens : 113.0 : 247 : 0.10601671176022477
+ClippingVasDeferens : 48.0 : 21 : 0.034722222222222224
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.32959965911574696
+PullingSeminalVesicle : 436.0 : 885 : 0.06639559957622737
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.05998073024878353
+SuckingBlood : 1696.0 : 4650 : 0.39625160321733743
+SuckingSmoke : 771.0 : 1299 : 0.10592600885337702
+PullingTissue : 2024.0 : 11235 : 0.23234509470368292
+CuttingTissue : 2055.0 : 4763 : 0.263974641128042
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.025827961742254955
+BladderAnastomosis : 1828.0 : 10618 : 0.16983198316547893
+PullingProstate : 451.0 : 2670 : 0.05035292216542619
+ClippingBladderNeck : 18.0 : 157 : 0.025396825396825393
+CuttingThread : 40.0 : 323 : 0.008684412586317507
+UrethraDissection : 439.0 : 1007 : 0.07123317042315509
+CuttingProstate : 48.0 : 1988 : 0.010725570163445254
+PullingBladderNeck : 105.0 : 2473 : 2.296277160653291e-05
+
+MEANAP:::=>9.6614
+
+
+
+IOU Threshold: 0.45:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.058500310182099925
+PullingVasDeferens : 113.0 : 247 : 0.10601671176022477
+ClippingVasDeferens : 48.0 : 21 : 0.006944444444444444
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.21196718752911214
+PullingSeminalVesicle : 436.0 : 885 : 0.05547101602172138
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.04582401558123676
+SuckingBlood : 1696.0 : 4650 : 0.3203143537177314
+SuckingSmoke : 771.0 : 1299 : 0.08305124790090193
+PullingTissue : 2024.0 : 11235 : 0.1740095553971983
+CuttingTissue : 2055.0 : 4763 : 0.19683956806111932
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.020548113314442864
+BladderAnastomosis : 1828.0 : 10618 : 0.10265484349645226
+PullingProstate : 451.0 : 2670 : 0.040591046011207096
+ClippingBladderNeck : 18.0 : 157 : 0.015701142452734806
+CuttingThread : 40.0 : 323 : 0.0012500000000000002
+UrethraDissection : 439.0 : 1007 : 0.041393046422289324
+CuttingProstate : 48.0 : 1988 : 0.007534722222222222
+PullingBladderNeck : 105.0 : 2473 : 2.296277160653291e-05
+
+MEANAP:::=>7.0887
+
+
+
+IOU Threshold: 0.50:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.050357183492352436
+PullingVasDeferens : 113.0 : 247 : 0.07713542756513739
+ClippingVasDeferens : 48.0 : 21 : 0.006944444444444444
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.1864405085866273
+PullingSeminalVesicle : 436.0 : 885 : 0.04276529761783619
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.03005476682632364
+SuckingBlood : 1696.0 : 4650 : 0.23687366867625273
+SuckingSmoke : 771.0 : 1299 : 0.06351370407335032
+PullingTissue : 2024.0 : 11235 : 0.11547076895266387
+CuttingTissue : 2055.0 : 4763 : 0.13399486884033662
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.011781624326938125
+BladderAnastomosis : 1828.0 : 10618 : 0.05726045935500155
+PullingProstate : 451.0 : 2670 : 0.02558475361972436
+ClippingBladderNeck : 18.0 : 157 : 0.015701142452734806
+CuttingThread : 40.0 : 323 : 0.0012500000000000002
+UrethraDissection : 439.0 : 1007 : 0.02455680921627028
+CuttingProstate : 48.0 : 1988 : 0.0061925724637681145
+PullingBladderNeck : 105.0 : 2473 : 2.296277160653291e-05
+
+MEANAP:::=>5.1710
+
+
+
+IOU Threshold: 0.55:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.019462910889694367
+PullingVasDeferens : 113.0 : 247 : 0.07547171692544696
+ClippingVasDeferens : 48.0 : 21 : 0.006944444444444444
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.1460688643337045
+PullingSeminalVesicle : 436.0 : 885 : 0.031805715332642634
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.025611733641161455
+SuckingBlood : 1696.0 : 4650 : 0.1426839818592185
+SuckingSmoke : 771.0 : 1299 : 0.037471188128321106
+PullingTissue : 2024.0 : 11235 : 0.07343431918332537
+CuttingTissue : 2055.0 : 4763 : 0.07187060932027672
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.004394583859862796
+BladderAnastomosis : 1828.0 : 10618 : 0.035389841959986734
+PullingProstate : 451.0 : 2670 : 0.012307695755425839
+ClippingBladderNeck : 18.0 : 157 : 0.00035385704175513094
+CuttingThread : 40.0 : 323 : 0.0012500000000000002
+UrethraDissection : 439.0 : 1007 : 0.011852773223004341
+CuttingProstate : 48.0 : 1988 : 0.0034573317063249947
+PullingBladderNeck : 105.0 : 2473 : 2.296277160653291e-05
+
+MEANAP:::=>3.3326
+
+
+
+IOU Threshold: 0.60:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.007175094409136962
+PullingVasDeferens : 113.0 : 247 : 0.039727722486356865
+ClippingVasDeferens : 48.0 : 21 : 0.006944444444444444
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.08082341132569443
+PullingSeminalVesicle : 436.0 : 885 : 0.024321509463798775
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.01728854740547646
+SuckingBlood : 1696.0 : 4650 : 0.07728063269020664
+SuckingSmoke : 771.0 : 1299 : 0.02586011646361493
+PullingTissue : 2024.0 : 11235 : 0.03581869023708019
+CuttingTissue : 2055.0 : 4763 : 0.03467158457292877
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.0026164264845682642
+BladderAnastomosis : 1828.0 : 10618 : 0.02004423940019604
+PullingProstate : 451.0 : 2670 : 0.006512408278302797
+ClippingBladderNeck : 18.0 : 157 : 0.00035385704175513094
+CuttingThread : 40.0 : 323 : 0.0012500000000000002
+UrethraDissection : 439.0 : 1007 : 0.004350689691788407
+CuttingProstate : 48.0 : 1988 : 0.0025652430343705507
+PullingBladderNeck : 105.0 : 2473 : 2.296277160653291e-05
+
+MEANAP:::=>1.8458
+
+
+
+IOU Threshold: 0.65:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.0055033618863406086
+PullingVasDeferens : 113.0 : 247 : 0.023315180394826412
+ClippingVasDeferens : 48.0 : 21 : 0.006944444444444444
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.03828282828282828
+PullingSeminalVesicle : 436.0 : 885 : 0.00939459835229803
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.008883682228304587
+SuckingBlood : 1696.0 : 4650 : 0.03150362090928026
+SuckingSmoke : 771.0 : 1299 : 0.012937325771821105
+PullingTissue : 2024.0 : 11235 : 0.013256556653994517
+CuttingTissue : 2055.0 : 4763 : 0.01493134365180088
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.001267439345241978
+BladderAnastomosis : 1828.0 : 10618 : 0.009043958346206353
+PullingProstate : 451.0 : 2670 : 0.002253345222328545
+ClippingBladderNeck : 18.0 : 157 : 0.0
+CuttingThread : 40.0 : 323 : 0.0
+UrethraDissection : 439.0 : 1007 : 0.0014721415989170092
+CuttingProstate : 48.0 : 1988 : 0.0018064876957494408
+PullingBladderNeck : 105.0 : 2473 : 2.296277160653291e-05
+
+MEANAP:::=>0.8610
+
+
+
+IOU Threshold: 0.70:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.003799392097264437
+PullingVasDeferens : 113.0 : 247 : 0.020894788593903636
+ClippingVasDeferens : 48.0 : 21 : 0.006944444444444444
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.03828282828282828
+PullingSeminalVesicle : 436.0 : 885 : 0.0036185315675232523
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.007028076671536384
+SuckingBlood : 1696.0 : 4650 : 0.01009452409418875
+SuckingSmoke : 771.0 : 1299 : 0.004675846801865942
+PullingTissue : 2024.0 : 11235 : 0.004931315623530107
+CuttingTissue : 2055.0 : 4763 : 0.0046722801525806625
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.00023724912133268503
+BladderAnastomosis : 1828.0 : 10618 : 0.0030485745581155556
+PullingProstate : 451.0 : 2670 : 0.0012605201362144275
+ClippingBladderNeck : 18.0 : 157 : 0.0
+CuttingThread : 40.0 : 323 : 0.0
+UrethraDissection : 439.0 : 1007 : 0.0011967238831008605
+CuttingProstate : 48.0 : 1988 : 0.0014771100264388856
+PullingBladderNeck : 105.0 : 2473 : 0.0
+
+MEANAP:::=>0.5341
+
+
+
+IOU Threshold: 0.75:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.001266464032421479
+PullingVasDeferens : 113.0 : 247 : 0.009882005899705015
+ClippingVasDeferens : 48.0 : 21 : 0.006944444444444444
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.01787878787878788
+PullingSeminalVesicle : 436.0 : 885 : 0.001389244877090977
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.0016696917658226946
+SuckingBlood : 1696.0 : 4650 : 0.003604650866858762
+SuckingSmoke : 771.0 : 1299 : 0.0011076436427770826
+PullingTissue : 2024.0 : 11235 : 0.0015585391834554594
+CuttingTissue : 2055.0 : 4763 : 0.0007649653117812312
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 7.629339747962518e-05
+BladderAnastomosis : 1828.0 : 10618 : 0.0007534247731428676
+PullingProstate : 451.0 : 2670 : 0.0009936769550087652
+ClippingBladderNeck : 18.0 : 157 : 0.0
+CuttingThread : 40.0 : 323 : 0.0
+UrethraDissection : 439.0 : 1007 : 0.00012061987476857254
+CuttingProstate : 48.0 : 1988 : 0.000492932682529998
+PullingBladderNeck : 105.0 : 2473 : 0.0
+
+MEANAP:::=>0.2310
+
+
+
+IOU Threshold: 0.80:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.0007598784194528874
+PullingVasDeferens : 113.0 : 247 : 0.004424778761061947
+ClippingVasDeferens : 48.0 : 21 : 0.0
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.0015151515151515152
+PullingSeminalVesicle : 436.0 : 885 : 0.00018100475462104278
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 1.4477017734346725e-05
+SuckingBlood : 1696.0 : 4650 : 0.0009765178500719047
+SuckingSmoke : 771.0 : 1299 : 0.00022478613809244938
+PullingTissue : 2024.0 : 11235 : 0.0002673691593671409
+CuttingTissue : 2055.0 : 4763 : 0.00016051607250351787
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.0
+BladderAnastomosis : 1828.0 : 10618 : 0.0001722836732349737
+PullingProstate : 451.0 : 2670 : 0.00043164023617834143
+ClippingBladderNeck : 18.0 : 157 : 0.0
+CuttingThread : 40.0 : 323 : 0.0
+UrethraDissection : 439.0 : 1007 : 1.0748199750787098e-05
+CuttingProstate : 48.0 : 1988 : 5.6377924059446236e-05
+PullingBladderNeck : 105.0 : 2473 : 0.0
+
+MEANAP:::=>0.0438
+
+
+
+IOU Threshold: 0.85:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.0
+PullingVasDeferens : 113.0 : 247 : 0.0
+ClippingVasDeferens : 48.0 : 21 : 0.0
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.0
+PullingSeminalVesicle : 436.0 : 885 : 3.9544447959506484e-05
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.0
+SuckingBlood : 1696.0 : 4650 : 0.0004085072575823502
+SuckingSmoke : 771.0 : 1299 : 2.7087346230272707e-05
+PullingTissue : 2024.0 : 11235 : 1.83637729293543e-05
+CuttingTissue : 2055.0 : 4763 : 1.976523186873731e-05
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.0
+BladderAnastomosis : 1828.0 : 10618 : 1.9342686977265854e-05
+PullingProstate : 451.0 : 2670 : 2.5282724061821316e-06
+ClippingBladderNeck : 18.0 : 157 : 0.0
+CuttingThread : 40.0 : 323 : 0.0
+UrethraDissection : 439.0 : 1007 : 2.5338201646476343e-06
+CuttingProstate : 48.0 : 1988 : 1.2711002643888549e-05
+PullingBladderNeck : 105.0 : 2473 : 0.0
+
+MEANAP:::=>0.0026
+
+
+
+IOU Threshold: 0.90:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.0
+PullingVasDeferens : 113.0 : 247 : 0.0
+ClippingVasDeferens : 48.0 : 21 : 0.0
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.0
+PullingSeminalVesicle : 436.0 : 885 : 0.0
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.0
+SuckingBlood : 1696.0 : 4650 : 5.345725322357176e-06
+SuckingSmoke : 771.0 : 1299 : 3.234456013015451e-06
+PullingTissue : 2024.0 : 11235 : 6.389651001898988e-07
+CuttingTissue : 2055.0 : 4763 : 3.743215422047539e-06
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.0
+BladderAnastomosis : 1828.0 : 10618 : 1.4925455953607439e-05
+PullingProstate : 451.0 : 2670 : 0.0
+ClippingBladderNeck : 18.0 : 157 : 0.0
+CuttingThread : 40.0 : 323 : 0.0
+UrethraDissection : 439.0 : 1007 : 0.0
+CuttingProstate : 48.0 : 1988 : 0.0
+PullingBladderNeck : 105.0 : 2473 : 0.0
+
+MEANAP:::=>0.0001
+
+
+
+IOU Threshold: 0.95:: 
+
+CuttingMesocolon : 188.0 : 24 : 0.0
+PullingVasDeferens : 113.0 : 247 : 0.0
+ClippingVasDeferens : 48.0 : 21 : 0.0
+CuttingVasDeferens : 36.0 : 7 : 0.0
+ClippingTissue : 15.0 : 155 : 0.0
+PullingSeminalVesicle : 436.0 : 885 : 0.0
+ClippingSeminalVesicle : 33.0 : 25 : 0.0
+CuttingSeminalVesicle : 307.0 : 562 : 0.0
+SuckingBlood : 1696.0 : 4650 : 5.424311329433615e-07
+SuckingSmoke : 771.0 : 1299 : 0.0
+PullingTissue : 2024.0 : 11235 : 0.0
+CuttingTissue : 2055.0 : 4763 : 3.743215422047539e-06
+BaggingProstate : 37.0 : 19 : 0.0
+BladderNeckDissection : 519.0 : 673 : 0.0
+BladderAnastomosis : 1828.0 : 10618 : 0.0
+PullingProstate : 451.0 : 2670 : 0.0
+ClippingBladderNeck : 18.0 : 157 : 0.0
+CuttingThread : 40.0 : 323 : 0.0
+UrethraDissection : 439.0 : 1007 : 0.0
+CuttingProstate : 48.0 : 1988 : 0.0
+PullingBladderNeck : 105.0 : 2473 : 0.0
+
+MEANAP:::=>0.0000
+
+printing the on mAP results again 
+
+
+IOU Threshold: 0.05:: 
+
+
+MEANAP:::=>16.3969
+
+
+
+IOU Threshold: 0.10:: 
+
+
+MEANAP:::=>16.2449
+
+
+
+IOU Threshold: 0.15:: 
+
+
+MEANAP:::=>15.7009
+
+
+
+IOU Threshold: 0.20:: 
+
+
+MEANAP:::=>15.0738
+
+
+
+IOU Threshold: 0.25:: 
+
+
+MEANAP:::=>13.9052
+
+
+
+IOU Threshold: 0.30:: 
+
+
+MEANAP:::=>12.9192
+
+
+
+IOU Threshold: 0.35:: 
+
+
+MEANAP:::=>11.4276
+
+
+
+IOU Threshold: 0.40:: 
+
+
+MEANAP:::=>9.6614
+
+
+
+IOU Threshold: 0.45:: 
+
+
+MEANAP:::=>7.0887
+
+
+
+IOU Threshold: 0.50:: 
+
+
+MEANAP:::=>5.1710
+
+
+
+IOU Threshold: 0.55:: 
+
+
+MEANAP:::=>3.3326
+
+
+
+IOU Threshold: 0.60:: 
+
+
+MEANAP:::=>1.8458
+
+
+
+IOU Threshold: 0.65:: 
+
+
+MEANAP:::=>0.8610
+
+
+
+IOU Threshold: 0.70:: 
+
+
+MEANAP:::=>0.5341
+
+
+
+IOU Threshold: 0.75:: 
+
+
+MEANAP:::=>0.2310
+
+
+
+IOU Threshold: 0.80:: 
+
+
+MEANAP:::=>0.0438
+
+
+
+IOU Threshold: 0.85:: 
+
+
+MEANAP:::=>0.0026
+
+
+
+IOU Threshold: 0.90:: 
+
+
+MEANAP:::=>0.0001
+
+
+
+IOU Threshold: 0.95:: 
+
+
+MEANAP:::=>0.0000
+
