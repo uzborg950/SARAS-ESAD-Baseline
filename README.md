@@ -113,6 +113,7 @@ Loss   |depth | min dim  | AP_10    | AP_30   |  AP_50   | AP_MEAN  |
 | Focal| 50   |  800     |  30.1   | 20.0    | 10.0   | 20.0 |  
 | OHEM | 50   |  800     |  34.9    | **24.4**    | **12.2**   |    **24.4**  |
 
+Outputs from the lastest model (800 OHEM) are uploaded in the sample folder. These are generated using the same model (800 OHEM). See flag at line [evaluate.py 114](https://github.com/Viveksbawa/SARAS-ESAD-Baseline/blob/master/evaluate.py#L114) to select validation or testing set (which will be available on 10th June).
 
 ## Details
 - Input image size (`height x width`)is `600x1067` or `800x1422`.

@@ -109,9 +109,10 @@ def main():
                         Resize(args.min_size, args.max_size),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
-
-    # val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=False)
-    val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['test/obj'], transform=val_transform, full_test=True)
+    if True: # while validating
+        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=False)
+    else: # while testing
+        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['test/obj'], transform=val_transform, full_test=True)
 
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
 
