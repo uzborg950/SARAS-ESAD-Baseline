@@ -13,7 +13,8 @@ The code is adopated from [RetinaNet implementation in pytorch.1.x](https://gith
 
 ## Introduction
 
-Here, we implement basic data-handling tools for [SARAS-ESAD](https://saras-esad.grand-challenge.org/Dataset/) dataset with FPN training process. We implement a pure pytorch code for train FPN with [Focal-Loss](https://arxiv.org/pdf/1708.02002.pdf) or [OHEM/multi-box-loss](https://arxiv.org/pdf/1512.02325.pdf) paper. Aim of this repository try different loss functions and make a fair comparison in terms of performance on SARAR-ESAD dataset.
+Here, we implement basic data-handling tools for [SARAS-ESAD](https://saras-esad.grand-challenge.org/Dataset/) dataset with FPN training process. We implement a pure pytorch code for train FPN with [Focal-Loss](https://arxiv.org/pdf/1708.02002.pdf) or [OHEM/multi-box-loss](https://arxiv.org/pdf/1512.02325.pdf) paper. 
+<!-- Aim of this repository try different loss functions and make a fair comparison in terms of performance on SARAR-ESAD dataset. -->
 
 We hope this will help kick start more teams to get up to the speed and allow the time for more innovative solutions. We want to eliminate the pain of building data handling and training process from scratch. Our final aim is to get this repository the level of [realtime-action-detection](https://github.com/gurkirt/realtime-action-detection).
 
