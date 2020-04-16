@@ -121,5 +121,5 @@ Loss   |depth | min dim  | AP_10    | AP_30   |  AP_50   | AP_MEAN  |
 - max number of iterations is set to 6000
 - SGD is used for the optimisation
 - initial learning rate is set to `0.01`
-- learning rate is dropped by the factor of 10 after 4500 iterations
+- learning rate is dropped by the factor of 10 after 5000 iterations
 - Different training setting might result in better/same/worse performance
