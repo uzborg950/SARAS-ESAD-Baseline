@@ -104,13 +104,13 @@ Here are the results on `esad` dataset.
 
 Loss   |depth | min dim  | AP_10    | AP_30   |  AP_50   | AP_MEAN  |   
 |----- |----- |:-------: |:--------:| :-----: | :-------:| :------: |
-| Focal| 50   |  200     | 34.9     | 18.6   | 06.7 | 20.1 |  
+<!-- | Focal| 50   |  200     | 34.9     | 18.6   | 06.7 | 20.1 |   -->
 | OHEM | 50   |  200     | 35.0 | 18.7| 06.3     | 20.0     |
-| Focal| 50   |  400     | **37.1**     | 21.5    | 08.5 | 22.4 |  
+<!-- | Focal| 50   |  400     | **37.1**     | 21.5    | 08.5 | 22.4 |   -->
 | OHEM | 50   |  400     |  33.9 | 19.2 | 07.4     | 20.2     |
-| Focal| 50   |  600     | 33.2     | 20.2    | 09.9 | 21.1 |  
+<!-- | Focal| 50   |  600     | 33.2     | 20.2    | 09.9 | 21.1 |   -->
 | OHEM | 50   |  600     | 33.6 | 23.4| 11.2     | 22.7     |
-| Focal| 50   |  800     |  30.1   | 20.0    | 10.0   | 20.0 |  
+<!-- | Focal| 50   |  800     |  30.1   | 20.0    | 10.0   | 20.0 | -->
 | OHEM | 50   |  800     |  34.9    | **24.4**    | **12.2**   |    **24.4**  |
 
 Outputs from the lastest model (800 OHEM) are uploaded in the sample folder. These are generated using the same model (800 OHEM). See flag at line [evaluate.py 114](https://github.com/Viveksbawa/SARAS-ESAD-Baseline/blob/master/evaluate.py#L114) to select validation or testing set (which will be available on 10th June).
