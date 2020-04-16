@@ -128,9 +128,9 @@ def main():
 
     for iteration in args.eval_iters:
         args.det_itr = iteration
-        log_file = open("{pt:s}/testing-{it:06d}-{date:%m-%d-%Hx}.log".format(pt=args.save_root, it=iteration, date=datetime.datetime.now()), "w", 10)
+        log_file = open("{pt:s}/testing-{it:06d}-{date:%m-%d-%Hx}.log".format(pt=args.save_root, it=iteration, date=datetime.datetime.now()), "w", 1)
         log_file.write(args.exp_name + '\n')
-        submission_file = open("{pt:s}/submission-{it:06d}-{date:%m-%d-%Hx}.txt".format(pt=args.save_root, it=iteration, date=datetime.datetime.now()), "w", 10)
+        submission_file = open("{pt:s}/submission-{it:06d}-{date:%m-%d-%Hx}.txt".format(pt=args.save_root, it=iteration, date=datetime.datetime.now()), "w", 1)
         args.model_path = args.save_root + 'model_{:06d}.pth'.format(iteration)
         log_file.write(args.model_path+'\n')
     
@@ -262,7 +262,7 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
                         boxes[ik, 1] = max(0, boxes[ik, 1])
                         boxes[ik, 3] = min(height, boxes[ik, 3])
                         write_string = '{:s} {:0.6f} {:0.6f} {:0.6f} {:0.6f} {:0.6f} {:d}\n'.format(image_name, 
-                                        boxes[ik, 0], boxes[ik, 0], boxes[ik, 0], boxes[ik, 0], scores[ik], cl_ind-1)
+                                        boxes[ik, 0]/width, boxes[ik, 1]/height, boxes[ik, 2]/width, boxes[ik, 3]/height, scores[ik], cl_ind-1)
                         submission_file.write(write_string)
                     
                     cls_dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=True)
@@ -281,6 +281,7 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
                 print('NMS stuff Time {:0.3f}'.format(te - tf))
 
 
+    submission_file.close()
     print('Evaluating detections for itration number ', iteration_num)
     return_list = []
     for iou_thresh in iou_threshs:
