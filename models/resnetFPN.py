@@ -211,6 +211,7 @@ class ResNetFPN(nn.Module):
 
 def resnetfpn(perms, name, use_bias, seq_len=1):
     num = int(name[6:])
+    print('Nume', num)
     if num<50:
         return ResNetFPN(BasicBlock, perms, use_bias, seq_len)
     else:

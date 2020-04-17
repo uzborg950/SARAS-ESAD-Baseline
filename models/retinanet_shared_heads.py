@@ -143,4 +143,7 @@ class RetinaNet(nn.Module):
         return layers
 
 def build_retinanet_shared_heads(args):
-    return RetinaNet(backbone_models(args.basenet, args.model_dir, args.use_bias), args)
+    # print('basenet', args.basenet)
+    backbone = backbone_models(args.basenet, args.model_dir, args.use_bias)
+    # print('backbone model::', backbone)
+    return RetinaNet(backbone, args)

@@ -1,6 +1,8 @@
 """ 
 
     Author: Vivek Singh and Gurkirt Singh 
+    DATE: April 2020
+
     Parts of this files are from many github repos
 
     @gurkirt mostly from https://github.com/gurkirt/RetinaNet.pytorch.1.x
@@ -17,6 +19,7 @@
     
     Please don't remove above credits and give star to these repos
     Licensed under The MIT License [see LICENSE for details]
+
 """
 
 import os
