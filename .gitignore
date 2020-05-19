@@ -15,3 +15,5 @@ weights/
 .idea/
 __pycache__/
 
+#directories
+results/
