@@ -70,11 +70,11 @@ parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of 
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
-parser.add_argument('--max_iter', default=6000, type=int, help='Number of training iterations')
+parser.add_argument('--max_iter', default=9000, type=int, help='Number of training iterations')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
-parser.add_argument('--milestones', default='5000,7000', type=str, help='Chnage the lr @')
+parser.add_argument('--milestones', default='6000,8000', type=str, help='Chnage the lr @')
 parser.add_argument('--gammas', default='0.1,0.1', type=str, help='Gamma update for SGD')
 parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay for SGD')
 

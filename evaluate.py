@@ -57,7 +57,7 @@ parser.add_argument('--num_workers', '-j', default=8, type=int, help='Number of 
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
-parser.add_argument('--eval_iters', default='6000', type=str, help='Chnage the lr @')
+parser.add_argument('--eval_iters', default='5000,6000,7000,8000,9000', type=str, help='Chnage the lr @')
 
 # Freeze batch normlisatio layer or not 
 parser.add_argument('--fbn', default=True, type=bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
@@ -112,7 +112,7 @@ def main():
     if True: # while validating
         val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=False)
     else: # while testing
-        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['test/obj'], transform=val_transform, full_test=True)
+        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['testC'], transform=val_transform, full_test=True)
 
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
 
@@ -127,15 +127,25 @@ def main():
         print('\nLets do dataparallel\n')
         net = torch.nn.DataParallel(net)
     net.eval()
+    
+    if len(args.iou_threshs)>2:
+        args.iou_threshs = [float(th) for th in args.iou_threshs.split(',')]
+    else:
+        args.iou_threshs = [th for th in np.arange(0.05,0.951,0.05)]
 
+    overal_json_object = {}
     for iteration in args.eval_iters:
         args.det_itr = iteration
-        log_file = open("{pt:s}/testing-{it:06d}-{date:%m-%d-%Hx}.log".format(pt=args.save_root, it=iteration, date=datetime.datetime.now()), "w", 1)
-        log_file.write(args.exp_name + '\n')
-        submission_file = open("{pt:s}/submission-{it:06d}-{date:%m-%d-%Hx}.txt".format(pt=args.save_root, it=iteration, date=datetime.datetime.now()), "w", 1)
         args.model_path = args.save_root + 'model_{:06d}.pth'.format(iteration)
+        
+        if not os.path.isfile(args.model_path):
+            continue
+
+        log_file = open("{pt:s}/testing-{it:06d}.log".format(pt=args.save_root, it=iteration), "w", 1)
+        log_file.write(args.exp_name + '\n')
+        submission_file = open("{pt:s}/submission.txt".format(pt=args.save_root), "w", 1)
         log_file.write(args.model_path+'\n')
-    
+
         net.load_state_dict(torch.load(args.model_path))
 
         print('Finished loading model %d !' % iteration)
@@ -148,17 +158,15 @@ def main():
         tt0 = time.perf_counter()
         log_file.write('Testing net \n')
         net.eval() # switch net to evaluation mode
-        if len(args.iou_threshs)>2:
-            args.iou_threshs = [float(th) for th in args.iou_threshs.split(',')]
-        else:
-            args.iou_threshs = [th for th in np.arange(0.05,0.951,0.05)]
+        
 
         # print(args.iou_threshs)
         result_list = validate(args, net, val_data_loader, val_dataset, iteration, submission_file, args.iou_threshs)
-
+       
         for result in result_list:
             [iou_thresh, mAP, ap_all, ap_strs] = result 
-            ptr_str = '\n\nIOU Threshold: {:0.2f}:: \n\n'.format(iou_thresh)
+            
+            ptr_str = '\n\nIOU Threshold: {:0.2f}:: \n'.format(iou_thresh)
             print(ptr_str)
             log_file.write(ptr_str)
 
@@ -166,26 +174,44 @@ def main():
                 print(ap_str)
                 log_file.write(ap_str+'\n')
             
-            ptr_str = '\nMEANAP:::=>{:0.4f}\n\n'.format(mAP*100)
+            ptr_str = '\nMEANAP:::=>{:0.4f}\n'.format(mAP*100)
             print(ptr_str)
             log_file.write(ptr_str)
         
         ptr_str = 'printing the on mAP results again \n'
         print(ptr_str)
         log_file.write(ptr_str)
-
+        
+        thmap_dict = {'30':0,'10':0,'50':0,'mean':0}
+        summap = 0
         for result in result_list:
             [iou_thresh, mAP, ap_all, ap_strs] = result 
-            ptr_str = '\n\nIOU Threshold: {:0.2f}:: \n\n'.format(iou_thresh)
+            thstr = str(int(iou_thresh*100))
+            if thstr in thmap_dict:
+                thmap_dict[thstr] = mAP*100
+                summap += mAP*100
+            ptr_str = '\nIOUTH : mAP :: {:0.2f} : {:0.2f}\n'.format(iou_thresh,mAP*100)
             print(ptr_str)
             log_file.write(ptr_str)
-            ptr_str = '\nMEANAP:::=>{:0.4f}\n\n'.format(mAP*100)
-            print(ptr_str)
-            log_file.write(ptr_str)
-
+            
+        thmap_dict['mean'] = summap/3.0
+        overal_json_object[str(int(iteration))] = thmap_dict
         torch.cuda.synchronize()
         print('Complete set time {:0.2f}'.format(time.perf_counter() - tt0))
         log_file.close()
+
+    result_name = 'results/frameAP-{:s}-{:s}-{:d}'.format(args.loss_type, args.basenet, args.min_size)
+
+    with open(result_name+'.json', 'w') as f:
+        json.dump(overal_json_object,f)
+    
+    fid = open(result_name+'.txt', 'w')
+    fid.write('{:s} {:s} {:d}\n'.format(args.loss_type, args.basenet, args.min_size))
+    for iter in sorted(overal_json_object.keys()):
+        res = overal_json_object[iter]
+        fid.write('{:s} {:0.1f} {:0.1f} {:0.1f} {:0.1f}\n'.format(iter, res['10'], res['30'], res['50'], res['mean']))
+    fid.close()
+
 
 
 def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission_file, iou_threshs=[0.2,0.25,0.3,0.4,0.5,0.75]):

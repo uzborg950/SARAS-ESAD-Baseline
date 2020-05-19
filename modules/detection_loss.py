@@ -242,9 +242,12 @@ class FocalLoss(nn.Module):
         labels = labels[mask].reshape(-1,num_classes) # Remove Ignore labels
         # with torch.no_grad():
         alpha_factor = self.alpha*labels + (1-self.alpha)*(1-labels)
-        focal_weight = ( 1.0 - object_preds ) * labels + object_preds * ( 1 - labels )
-        focal_weight = alpha_factor * (focal_weight ** self.gamma)
-        
+        # focal_weight = ( 1.0 - object_preds ) * labels + object_preds * ( 1 - labels )
+        # focal_weight = alpha_factor * (focal_weight ** self.gamma)
+        # parts from https://github.com/fizyr/keras-retinanet/blob/master/keras_retinanet/losses.py
+        pt = object_preds * labels + (1 - object_preds) * ( 1 - labels )
+        focal_weight = alpha_factor * ((1- pt) ** self.gamma)
+
         classification_loss = F.binary_cross_entropy(object_preds, labels, reduction='none')
         # pdb.set_trace()
         classification_loss = (classification_loss* focal_weight).sum() / num_pos
