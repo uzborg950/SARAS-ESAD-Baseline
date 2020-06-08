@@ -11,6 +11,24 @@ import torch, pdb, time
 from modules import box_utils
 
 
+def sigmoid_focal_loss(preds, labels, num_pos, alpha, gamma):
+    '''Args::
+        preds: sigmoid activated predictions
+        labels: one hot encoded labels
+        num_pos: number of positve samples
+        alpha: weighting factor to baclence +ve and -ve
+        gamma: Exponent factor to baclence easy and hard examples
+       Return::
+        loss: computed loss and reduced by sum and normlised by num_pos
+     '''
+    loss = F.binary_cross_entropy(preds, labels, reduction='none')
+    alpha_factor = alpha * labels + (1.0 - alpha) * (1.0 - labels)
+    pt = preds * labels + (1.0 - preds) * (1.0 - labels)
+    focal_weight = alpha_factor * ((1-pt) ** gamma)
+    loss = (loss * focal_weight).sum() / num_pos
+    return loss
+
+
 # Credits:: from https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/maskrcnn_benchmark/layers/smooth_l1_loss.py
 # smooth l1 with beta
 def smooth_l1_loss(input, target, beta=1. / 9, reduction='sum'):
@@ -240,26 +258,12 @@ class FocalLoss(nn.Module):
         mask = labels_bin > -1 # Get mask to remove ignore examples
         object_preds = object_preds[mask].reshape(-1,num_classes) # Remove Ignore preds
         labels = labels[mask].reshape(-1,num_classes) # Remove Ignore labels
-        # with torch.no_grad():
-        alpha_factor = self.alpha*labels + (1-self.alpha)*(1-labels)
-        # focal_weight = ( 1.0 - object_preds ) * labels + object_preds * ( 1 - labels )
-        # focal_weight = alpha_factor * (focal_weight ** self.gamma)
-        # parts from https://github.com/fizyr/keras-retinanet/blob/master/keras_retinanet/losses.py
-        pt = object_preds * labels + (1 - object_preds) * ( 1 - labels )
-        focal_weight = alpha_factor * ((1- pt) ** self.gamma)
 
-        classification_loss = F.binary_cross_entropy(object_preds, labels, reduction='none')
-        # pdb.set_trace()
-        classification_loss = (classification_loss* focal_weight).sum() / num_pos
-        
-        # labels_bin[labels_bin>0] = 1
-        # binary_preds = binary_preds[labels_bin>-1]
-        # labels_bin = labels_bin[labels_bin>-1]
-        # with torch.no_grad():
-        #     alpha_factor = self.alpha*labels_bin + (1-self.alpha)*(1-labels_bin)
-        #     focal_weight = ( 1.0 - binary_preds ) * labels_bin + binary_preds * ( 1 - labels_bin )
-        #     focal_weight = alpha_factor * focal_weight ** self.gamma
-        # binary_loss = F.binary_cross_entropy(binary_preds, labels_bin, weight=focal_weight, reduction='sum') / num_pos
-        # pdb.set_trace()
+        classification_loss = sigmoid_focal_loss(object_preds, labels, num_pos, self.alpha, self.gamma)
 
-        return localisation_loss, classification_loss
+        labels_bin[labels_bin>0] = 1
+        binary_preds = binary_preds[labels_bin>-1]
+        labels_bin = labels_bin[labels_bin>-1]
+        binary_loss = sigmoid_focal_loss(binary_preds.float(), labels_bin.float(), num_pos, self.alpha, self.gamma)
+
+        return localisation_loss, (classification_loss + binary_loss)/2.0

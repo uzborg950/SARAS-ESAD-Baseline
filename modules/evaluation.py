@@ -57,7 +57,7 @@ def compute_iou(cls_gt_boxes, box):
     for m in range(ious.shape[0]):
         gtbox = cls_gt_boxes[m]
 
-        xmin = max(gtbox[0],box[0])
+        xmin = max(gtbox[0], box[0])
         ymin = max(gtbox[1], box[1])
         xmax = min(gtbox[2], box[2])
         ymax = min(gtbox[3], box[3])
@@ -69,7 +69,7 @@ def compute_iou(cls_gt_boxes, box):
             intsc = 0.0
         # print (intsc)
         union = (gtbox[2] - gtbox[0]) * (gtbox[3] - gtbox[1]) + (box[2] - box[0]) * (box[3] - box[1]) - intsc
-        ious[m] = intsc/union
+        ious[m] = float(intsc)/float(union)
 
     return ious
 
@@ -108,6 +108,7 @@ def evaluate_detections(gt_boxes, det_boxes, CLASSES=[], iou_thresh=0.5):
                             istp[det_count] = 1 # set current detection index (det_count)
                             #  to 1 if it is true postive example
                         det_count += 1
+        
         if num_postives<1:
             num_postives =1
         scores = scores[:det_count]

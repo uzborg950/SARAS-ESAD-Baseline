@@ -57,7 +57,7 @@ parser.add_argument('--num_workers', '-j', default=8, type=int, help='Number of 
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
-parser.add_argument('--eval_iters', default='5000,6000,7000,8000,9000', type=str, help='Chnage the lr @')
+parser.add_argument('--eval_iters', default='5000,7000,9000', type=str, help='Chnage the lr @')
 
 # Freeze batch normlisatio layer or not 
 parser.add_argument('--fbn', default=True, type=bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
@@ -109,10 +109,10 @@ def main():
                         Resize(args.min_size, args.max_size),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
-    if True: # while validating
+    if False: # while validating
         val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=False)
     else: # while testing
-        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['testC'], transform=val_transform, full_test=True)
+        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['testC'], transform=val_transform, full_test=False)
 
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
 

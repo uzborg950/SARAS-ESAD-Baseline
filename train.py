@@ -87,7 +87,7 @@ parser.add_argument('--positive_threshold', default=0.5, type=float, help='Min J
 parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min Jaccard index for matching')
 
 # Evaluation hyperparameters
-parser.add_argument('--intial_val', default=500, type=int, help='Initial number of training iterations before evaluation')
+parser.add_argument('--intial_val', default=5000, type=int, help='Initial number of training iterations before evaluation')
 parser.add_argument('--val_step', default=1000, type=int, help='Number of training iterations before evaluation')
 parser.add_argument('--iou_thresh', default=0.25, type=float, help='Evaluation threshold')
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')

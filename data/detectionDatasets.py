@@ -67,7 +67,7 @@ def read_sets(path, input_sets=['train/set1','train/set2'], full_test=False):
         all_files.extend(image_files)
         
     labels= read_labels(all_files, full_test)
-
+    print('length of labels', len(labels))
     return(labels)
     
             
