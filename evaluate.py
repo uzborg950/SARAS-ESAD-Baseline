@@ -57,7 +57,7 @@ parser.add_argument('--num_workers', '-j', default=8, type=int, help='Number of 
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
-parser.add_argument('--eval_iters', default='5000,7000,9000', type=str, help='Chnage the lr @')
+parser.add_argument('--eval_iters', default='5000,6000,7000,9000', type=str, help='Chnage the lr @')
 
 # Freeze batch normlisatio layer or not 
 parser.add_argument('--fbn', default=True, type=bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
@@ -200,7 +200,7 @@ def main():
         print('Complete set time {:0.2f}'.format(time.perf_counter() - tt0))
         log_file.close()
 
-    result_name = 'results/frameAP-{:s}-{:s}-{:d}'.format(args.loss_type, args.basenet, args.min_size)
+    result_name = 'results/test-frameAP-{:s}-{:s}-{:d}'.format(args.loss_type, args.basenet, args.min_size)
 
     with open(result_name+'.json', 'w') as f:
         json.dump(overal_json_object,f)

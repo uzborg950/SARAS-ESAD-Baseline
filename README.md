@@ -103,16 +103,31 @@ This will dump a log file with **results(mAP)** on the validation set and as wel
 ## Results
 Here are the results on `esad` dataset.
 
-Loss   |depth | min dim  | AP_10    | AP_30   |  AP_50   | AP_MEAN  |   
+Results of the baseline models with different loss function and input image sizes, where  backbone network fixed to ResNet50. **AP_10**, **AP_30**, **AP_50**, and **AP_mean** are presented on validation-set, while **Test-AP_mean** is computed based on test-set similar to **AP_mean**.
+
+| Loss   | min dim  | AP_10    | AP_30   |  AP_50   | AP_MEAN  |   Test-AP_MEAN |
 |----- |----- |:-------: |:--------:| :-----: | :-------:| :------: |
-| OHEM | 50   |  200     | 35.0 | 18.7| 06.3     | 20.0     |
-| OHEM | 50   |  400     |  33.9 | 19.2 | 07.4     | 20.2     |
-| OHEM | 50   |  600     | 33.6 | 23.4| 11.2     | 22.7     |
-| OHEM | 50   |  800     |  34.9    | **24.4**    | **12.2**   |    **24.4**  |
-<!-- | Focal| 50   |  200     | 34.9     | 18.6   | 06.7 | 20.1 |   -->
-<!-- | Focal| 50   |  400     | **37.1**     | 21.5    | 08.5 | 22.4 |   -->
-<!-- | Focal| 50   |  600     | 33.2     | 20.2    | 09.9 | 21.1 |   -->
-<!-- | Focal| 50   |  800     |  30.1   | 20.0    | 10.0   | 20.0 | -->
+| Focal  |  200  |  33.8  |  17.7  |  6.6  |  19.4  |  15.7  | 
+| Focal  |  400  |  35.9  |  19.4  |  8.0  |  21.1  | **16.1** | 
+| Focal  |  600  |  29.2  |  17.6  |  8.7  |  18.5  |  14.0  | 
+| Focal  |  800  |  31.9  |  20.1  |  8.7  |  20.2  |  12.4  | 
+| OHEM  |  200  |  35.1  |  18.7  |  6.3  |  20.0  |  11.3  | 
+| OHEM  |  400  |  33.9  |  19.2  |  7.4  |  20.2  |  13.6  | 
+| OHEM  |  600  |  37.6  |  23.4  |  11.2  |  24.1  |  12.5  | 
+| OHEM  | 800 | **36.8** | **24.3** | **12.2** | **24.4** | 12.3|
+
+Results of the baseline models with different loss function, backbone networks, where input image size is fixed to 400. **AP_10**, **AP_30**, **AP_50**, and **AP_mean** are presented on validation-set, while **Test-AP_mean** is computed based on test-set similar to **AP_mean**.
+
+| Loss   | Network | AP_10    | AP_30   |  AP_50   | AP_MEAN  |  Test-AP_MEAN |
+|----- |----- |:-------: |:--------:| :-----: | :-------:| :------: |
+| Focal | ResNet18 | 35.1 | 18.9 | 8.1 | 20.7 | **15.3** |
+| OHEM | ResNet18 | 36.0 | **20.7** | 7.7 | **21.5** | 13.8 |
+| Focal | ResNet34 | 34.6 | 18.9 | 6.4 | 19.9 | 14.3 |
+| OHEM | ResNet34 | **36.7** | 20.4 | 7.1 | 21.4 | 13.8 |
+| Focal | ResNet50 | 35.9 | 19.4 | **8.0** | 21.1 | 16.1 |
+| OHEM | ResNet50 | 33.9 | 19.2 | 7.4 | 20.2 | 13.6 |
+| Focal | ResNet101 | 32.5 | 17.2 | 6.1 | 18.6 | 14.0 |
+| OHEM | ResNet101 | 36.6 | 20.1 | 7.4 | 21.3 | 12.3 |
 
 Outputs from the lastest model (800 OHEM) are uploaded in the sample folder. These are generated using the same model (800 OHEM). See flag at line [evaluate.py 114](https://github.com/Viveksbawa/SARAS-ESAD-Baseline/blob/master/evaluate.py#L114) to select validation or testing set (which will be available on 10th June).
 

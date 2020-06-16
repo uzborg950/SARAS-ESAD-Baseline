@@ -21,10 +21,13 @@ import glob
 import pdb
 
 def read_file(path, full_test):
-    with open(path, 'r') as f:
-        lines = f.readlines()
-    
-    if not lines and full_test:
+    try:
+        with open(path, 'r') as f:
+            lines = f.readlines()
+    except:
+        lines = None
+
+    if lines is None and full_test:
         # in case we are testing and we don't have labels
         # but we need to return at least one label per image
         # we fake it like belwo
