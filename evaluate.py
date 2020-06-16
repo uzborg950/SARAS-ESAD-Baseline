@@ -112,7 +112,7 @@ def main():
     if False: # while validating
         val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=False)
     else: # while testing
-        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['testC'], transform=val_transform, full_test=False)
+        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['testC'], transform=val_transform, full_test=True)
 
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
 
