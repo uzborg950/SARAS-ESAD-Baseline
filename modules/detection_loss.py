@@ -192,7 +192,7 @@ class YOLOLoss(nn.Module):
 
 class FocalLoss(nn.Module):
     def __init__(self, positive_threshold, negative_threshold, alpha=0.25, gamma=2.0):
-        """Implement YOLO Loss.
+        """Implement focal Loss.
         Basically, combines focal classification loss
          and Smooth L1 regression loss.
         """
@@ -200,8 +200,8 @@ class FocalLoss(nn.Module):
         self.positive_threshold = positive_threshold
         self.negative_threshold = negative_threshold
         # self.bce_loss = nn.BCELoss(reduction='sum').cuda()
-        self.alpha = 0.25
-        self.gamma = 2.0
+        self.alpha = 0.25 #Weighs positive/negative examples
+        self.gamma = 2.0 #Focusing parameter, down weights easy examples (prob -> 1) for gamma > 1
 
 
     def forward(self, confidence, predicted_locations, gts, counts, anchors):
@@ -218,18 +218,18 @@ class FocalLoss(nn.Module):
         """
 
         confidence = torch.sigmoid(confidence)
-        binary_preds = confidence[:,:, 0]
-        object_preds = confidence[:,:,1:]
+        #binary_preds = confidence[:,:, 0]
+        object_preds = confidence[:,:,1:] #[2, x, 21]
         num_classes = object_preds.size(2)
         N = float(len(gts))
         gt_locations = []
         labels = []
         labels_bin = []
-        with torch.no_grad():
+        with torch.no_grad(): #Gets GT box and classes
             # torch.cuda.synchronize()
             # t0 = time.perf_counter()
             for b in range(len(gts)):
-                gt_boxes = gts[b, :counts[b], :4]
+                gt_boxes = gts[b, :counts[b], :4] #counts size is 2 (in train set 1 as that is the max action count in samples)
                 gt_labels = gts[b, :counts[b], 4]
                 gt_labels = gt_labels.type(torch.cuda.LongTensor)
 
@@ -248,10 +248,10 @@ class FocalLoss(nn.Module):
             labels = torch.stack(labels, 0)
             labels_bin = torch.stack(labels_bin, 0)
 
-        pos_mask = labels_bin > 0
+        pos_mask = labels_bin > 0 #13842 (same as 0th dimension of anchors tensor),2
         num_pos = max(1.0, float(pos_mask.sum()))
         
-        predicted_locations = predicted_locations[pos_mask].reshape(-1, 4)
+        predicted_locations = predicted_locations[pos_mask].reshape(-1, 4) #predicted locations is 2,13842,4
         gt_locations = gt_locations[pos_mask].reshape(-1, 4)
         localisation_loss = smooth_l1_loss(predicted_locations, gt_locations, reduction='sum')/(num_pos * 4.0)
         
@@ -261,9 +261,13 @@ class FocalLoss(nn.Module):
 
         classification_loss = sigmoid_focal_loss(object_preds, labels, num_pos, self.alpha, self.gamma)
 
-        labels_bin[labels_bin>0] = 1
-        binary_preds = binary_preds[labels_bin>-1]
-        labels_bin = labels_bin[labels_bin>-1]
-        binary_loss = sigmoid_focal_loss(binary_preds.float(), labels_bin.float(), num_pos, self.alpha, self.gamma)
+        #COMMENTED THIS OUT BECAUSE NOT SURE WHY THIS IS DONE
+        #labels_bin[labels_bin>0] = 1
+        #binary_preds = binary_preds[labels_bin>-1]
+        #labels_bin = labels_bin[labels_bin>-1]
+        #binary_loss = sigmoid_focal_loss(binary_preds.float(), labels_bin.float(), num_pos, self.alpha, self.gamma)
 
-        return localisation_loss, (classification_loss + binary_loss)/2.0
+        #COMMENTED THIS OUT BECAUSE I've REMOVED binary loss
+        #return localisation_loss, (classification_loss + binary_loss)/2.0
+
+        return localisation_loss, classification_loss

@@ -52,28 +52,31 @@ def make_01(v):
 
 parser = argparse.ArgumentParser(description='Training single stage FPN with OHEM, resnet as backbone')
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
-parser.add_argument('--basenet', default='resnet50', help='pretrained base model')
+parser.add_argument('--basenet', default='resnet18', help='pretrained base model')
+# Use LSTM
+parser.add_argument('--append_lstm', default=True, type=str2bool, help='Append lstm layer before flattened retinanet predictor heads')
+#parser.add_argument('--lstm_depth', default=198, type=int, help='Append lstm layer after FCN layers of retinaNet')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
 parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
-parser.add_argument('--shared_heads', default=0, type=int,help='4 head layers')
-parser.add_argument('--num_head_layers', default=4, type=int,help='0 mean no shareding more than 0 means shareing')
+parser.add_argument('--shared_heads', default=0, type=int,help='0 mean no sharing more than 0 means sharing')
+parser.add_argument('--num_head_layers', default=4, type=int,help='4 head layers')
 parser.add_argument('--use_bias', default=True, type=str2bool,help='0 mean no bias in head layears')
 #  Name of the dataset only voc or coco are supported
 parser.add_argument('--dataset', default='esad', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment 
-parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
+parser.add_argument('--min_size', default=200, type=int, help='Input Size for FPN') #o: 600
 parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
-parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training')
+parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training') # o:16
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
-parser.add_argument('--max_iter', default=9000, type=int, help='Number of training iterations')
+parser.add_argument('--max_iter', default=2, type=int, help='Number of training iterations') #o:9000
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
-parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
+parser.add_argument('--loss_type', default='focal', type=str, help='loss_type') #o:mbox
 parser.add_argument('--milestones', default='6000,8000', type=str, help='Chnage the lr @')
 parser.add_argument('--gammas', default='0.1,0.1', type=str, help='Gamma update for SGD')
 parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay for SGD')
@@ -89,7 +92,7 @@ parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min J
 # Evaluation hyperparameters
 parser.add_argument('--intial_val', default=5000, type=int, help='Initial number of training iterations before evaluation')
 parser.add_argument('--val_step', default=1000, type=int, help='Number of training iterations before evaluation')
-parser.add_argument('--iou_thresh', default=0.25, type=float, help='Evaluation threshold')
+parser.add_argument('--iou_thresh', default=0.30, type=float, help='Evaluation threshold') #For evaluation of val set, just check on AP50
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
 parser.add_argument('--topk', default=50, type=int, help='topk for evaluation')
@@ -101,13 +104,15 @@ parser.add_argument('--tensorboard', default=True, type=str2bool, help='Use tens
 
 # Program arguments
 parser.add_argument('--man_seed', default=123, type=int, help='manualseed for reproduction')
+
 parser.add_argument('--multi_gpu', default=True, type=str2bool, help='If  more than 0 then use all visible GPUs by default only one GPU used ') 
 
 # Use CUDA_VISIBLE_DEVICES=0,1,4,6 to select GPUs to use
-parser.add_argument('--data_root', default='/mnt/mercury-fast/datasets/', help='Location to root directory fo dataset') # /mnt/mars-fast/datasets/
-parser.add_argument('--save_root', default='/mnt/mercury-alpha/', help='Location to save checkpoint models') # /mnt/sun-gamma/datasets/
+parser.add_argument('--data_root', default='../', help='Location to root directory fo dataset') # /mnt/mars-fast/datasets/
+parser.add_argument('--save_root', default="..\\checkpoint\\", help='Location to save checkpoint models') # /mnt/sun-gamma/datasets/
 # parser.add_argument('--model_dir', default='/mnt/sun-beta/vivek/weights/', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
-parser.add_argument('--model_dir', default='/mnt/mars-gamma/global-models/pytorch-imagenet/', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
+parser.add_argument('--model_dir', default='../pretrain/resnet/', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
+
 # args.model_dir = ''
 ## Parse arguments
 args = parser.parse_args()
@@ -127,20 +132,20 @@ torch.set_default_tensor_type('torch.FloatTensor')
 def main():
     
     args.exp_name = utils.create_exp_name(args)
-    args.save_root += args.dataset+'/'
-    args.data_root += args.dataset+'/'
-    args.save_root = args.save_root+'cache/'+args.exp_name+'/'
+    args.save_root += args.dataset+'\\'
+    args.data_root += args.dataset+'\\'
+    args.save_root = args.save_root+'cache\\'+args.exp_name+'\\'
 
     if not os.path.isdir(args.save_root): #if save directory doesn't exist create it
         os.makedirs(args.save_root)
 
-    source_dir = args.save_root+'/source/' # where to save the source
+    source_dir = args.save_root+'source\\' # where to save the source
     utils.copy_source(source_dir) # make a copy of source files used for training as a snapshot
 
     print('\nLoading Datasets')
 
     train_transform = transforms.Compose([
-                        Resize(args.min_size, args.max_size),
+                        Resize(args.min_size, args.max_size),  #w=min size (200) h=200*1080/1920 =112  if height > width, then image will be rescaled to (size * height / width, size)
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means, std=args.stds)])
 
@@ -159,13 +164,14 @@ def main():
     args.use_bias = args.use_bias>0
     args.head_size = 256
     
-    net = build_retinanet_shared_heads(args).cuda()
+    net = build_retinanet_shared_heads(args).cuda() #The author has hardcoded the use of cuda so i can't use it on cpu.
     
     # print(net)
+    args.multi_gpu = False
     if args.multi_gpu:
         print('\nLets do dataparallel\n')
         net = torch.nn.DataParallel(net)
-
+ 
     if args.fbn:
         if args.multi_gpu:
             net.module.backbone_net.apply(utils.set_bn_eval)
@@ -311,7 +317,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                 torch.save(net.state_dict(), '{:s}/model_{:06d}.pth'.format(args.save_root, iteration))
                 torch.save(optimizer.state_dict(), '{:s}/optimizer_{:06d}.pth'.format(args.save_root, iteration))
                 net.eval() # switch net to evaluation mode
-                mAP, ap_all, ap_strs, _ = validate(args, net, val_data_loader, val_dataset, iteration, iou_thresh=args.iou_thresh)
+                mAP, ap_all, ap_strs, _ = validate(args, net, val_data_loader, val_dataset, iteration, iou_thresh=args.iou_thresh) #Finds only one IoU
                 net.train()
                 if args.fbn:
                     if args.multi_gpu:
@@ -337,7 +343,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                 t0 = time.perf_counter()
                 prt_str = '\nValidation TIME::: {:0.3f}\n\n'.format(t0-tvs)
                 print(prt_str)
-                log_file.write(ptr_str)
+                log_file.write(prt_str)
 
     log_file.close()
 

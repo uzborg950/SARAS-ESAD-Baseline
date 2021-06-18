@@ -45,7 +45,7 @@ class anchorBox(torch.nn.Module):
         self.strides = strides
         if anchor_type != 'pdf9':
             self.scales = np.array([2 ** 0,])
-        self.ar = len(self.ratios)*len(self.ratios)
+        self.ar = len(self.scales)*len(self.ratios) #Shouldn't this be len(scales) * len(ratios)?
         self.cell_anchors = BufferList(self._get_cell_anchors())
         
     def _get_cell_anchors(self):

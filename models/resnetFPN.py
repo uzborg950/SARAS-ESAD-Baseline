@@ -46,9 +46,10 @@ class BasicBlock(nn.Module):
 
         return out
 
-
+''' Bottle neck block consists of 1x1 convs and one 3x3 convs. This way we increase depth of the network while keeping
+number of params low (faster training) '''
 class Bottleneck(nn.Module):
-    expansion = 4
+    expansion = 4 #To expand the number of channels
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
         super(Bottleneck, self).__init__()
@@ -78,7 +79,7 @@ class Bottleneck(nn.Module):
         out = self.bn3(out)
 
         if self.downsample is not None:
-            residual = self.downsample(x)
+            residual = self.downsample(x)  #Downsample residual input to get proper dimensions for addition
 
         out += residual
         out = self.relu(out)
@@ -116,7 +117,7 @@ class ResNetFPN(nn.Module):
         self.corr_layer2 = conv3x3(256, 256, stride=1, padding=1, bias=use_bias)  # P4
         self.corr_layer3 = conv3x3(256, 256, stride=1, padding=1, bias=use_bias)  # P3
 
-        for m in self.modules():
+        for m in self.modules(): #initialize conv weights,biases and batch norm weights and biases
             if isinstance(m, nn.Conv2d):
                 torch.nn.init.kaiming_uniform_(m.weight, a=1)
                 if hasattr(m.bias, 'data'):
@@ -143,7 +144,7 @@ class ResNetFPN(nn.Module):
             )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
+        layers.append(block(self.inplanes, planes, stride, downsample)) #Only the first block is strided, the rest are stride = 1. So downsampling occurs on the first block only. The rest are simple convolutions
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
             layers.append(block(self.inplanes, planes))
@@ -166,11 +167,11 @@ class ResNetFPN(nn.Module):
 
         # Top-down
         p5 = self.lateral_layer1(c5)
-        p5_upsampled = self._upsample(p5, c4)
-        p5 = self.corr_layer1(p5)
+        p5_upsampled = self._upsample(p5, c4) #To be used in the next lateral layer later
+        p5 = self.corr_layer1(p5) #prediction head for top most (Note in the paper, Figure 4 has 5x5 convs)
 
         p4 = self.lateral_layer2(c4)
-        p4 = p5_upsampled + p4
+        p4 = p5_upsampled + p4 
         p4_upsampled = self._upsample(p4, c3)
         p4 = self.corr_layer2(p4)
 

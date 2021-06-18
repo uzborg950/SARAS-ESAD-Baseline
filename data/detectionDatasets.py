@@ -121,13 +121,13 @@ class DetectionDataset(data.Dataset):
         annot_info = self.ids[index]
         
         img_path = annot_info[0]
-        bbox_info = np.array(annot_info[1])
-        labels= bbox_info[:,4]
+        bbox_info = np.array(annot_info[1]) #shape: (G, 5) , G is the number of actions in frame. 5 is box coords (4) + action class(1)
+        labels= bbox_info[:,4] #Gets action ids in the frame
 
-        x1= bbox_info[:,0] - bbox_info[:,2]/2
-        y1= bbox_info[:,1] - bbox_info[:,3]/2
-        x2= bbox_info[:,0] + bbox_info[:,2]/2
-        y2= bbox_info[:,1] + bbox_info[:,3]/2
+        x1= bbox_info[:,0] - bbox_info[:,2]/2 #Upper left x 
+        y1= bbox_info[:,1] - bbox_info[:,3]/2 #Upper left y 
+        x2= bbox_info[:,0] + bbox_info[:,2]/2 #Lower right x 
+        y2= bbox_info[:,1] + bbox_info[:,3]/2 #Lower right y 
 
         boxes= np.hstack([np.expand_dims(x1, axis=1), np.expand_dims(y1, axis=1),
                           np.expand_dims(x2, axis=1), np.expand_dims(y2, axis=1)])
@@ -150,7 +150,7 @@ class DetectionDataset(data.Dataset):
 
         wh = [width, height, orig_w, orig_h]
         # print(wh)
-        boxes[:, 0] *= width # width x1
+        boxes[:, 0] *= width # width x1 (GT coords are normalized and need to be scaled by image size)
         boxes[:, 2] *= width # width x2
         boxes[:, 1] *= height # height y1
         boxes[:, 3] *= height # height y2
@@ -159,7 +159,7 @@ class DetectionDataset(data.Dataset):
         return img, targets, index, wh
         
 
-def custum_collate(batch):
+def custum_collate(batch): #batch size 16
     targets = []
     images = []
     image_ids = []
@@ -168,22 +168,23 @@ def custum_collate(batch):
     # rgb_images, flow_images, aug_bxsl, prior_labels, prior_gt_locations, num_mt, index
     
     for sample in batch:
-        images.append(sample[0])
-        targets.append(torch.FloatTensor(sample[1]))
-        image_ids.append(sample[2])
-        whs.append(sample[3])
+        images.append(sample[0]) #Pixel values stored in tensor are added to a list
+        targets.append(torch.FloatTensor(sample[1])) #
+        image_ids.append(sample[2]) #Index while iterating total list of samples (randomized iteration)
+        whs.append(sample[3]) #[width (1067), height (600), orig_w (1920), orig_h (1080)] (same for all tensors)
     
     counts = []
     max_len = -1
     for target in targets:
-        max_len = max(max_len, target.shape[0])
-        counts.append(target.shape[0])
-    new_targets = torch.zeros(len(targets), max_len, targets[0].shape[1])
+        max_len = max(max_len, target.shape[0]) #Max actions a sample could have in the whole dataset
+        counts.append(target.shape[0]) #Stores number of action classes in each sample
+    new_targets = torch.zeros(len(targets), max_len, targets[0].shape[1]) #shape (16 (targets/batch size),2 (max actions in a sample),5 (box coords + class))
     cc = 0
     for target in targets:
-        new_targets[cc,:target.shape[0]] = target
+        new_targets[cc,:target.shape[0]] = target #Each sample now always contains 2 targets (initialized to zero). This is done to make iteration of GTs easier for each sample
         cc += 1
-    images_ = get_image_list_resized(images)
+    images_ = get_image_list_resized(images) #Tensor size: [16, 3, 608, 1088], Originally used in maskrcnn to padding varying sized images to same size. Not Sure why used here
+    #images_ = images
     cts = torch.LongTensor(counts)
     # print(images_.shape)
     return images_, new_targets, cts, image_ids, whs

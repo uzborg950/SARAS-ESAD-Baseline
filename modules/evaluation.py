@@ -85,29 +85,29 @@ def evaluate_detections(gt_boxes, det_boxes, CLASSES=[], iou_thresh=0.5):
         det_count = 0
         num_postives = 0.0
         for nf in range(num_frames): # loop over each frame 'nf'
-                # if len(gt_boxes[nf])>0 and len(det_boxes[cls_ind][nf]):
-                frame_det_boxes = np.copy(det_boxes[cls_ind][nf]) # get frame detections for class cls in nf
-                cls_gt_boxes = get_gt_of_cls(np.copy(gt_boxes[nf]), cls_ind) # get gt boxes for class cls in nf frame
-                num_postives += cls_gt_boxes.shape[0]
-                if frame_det_boxes.shape[0]>0: # check if there are dection for class cls in nf frame
-                    argsort_scores = np.argsort(-frame_det_boxes[:,-1]) # sort in descending order
-                    for i, k in enumerate(argsort_scores): # start from best scoring detection of cls to end
-                        box = frame_det_boxes[k, :-1] # detection bounfing box
-                        score = frame_det_boxes[k,-1] # detection score
-                        ispositive = False # set ispostive to false every time
-                        if cls_gt_boxes.shape[0]>0: # we can only find a postive detection
-                            # if there is atleast one gt bounding for class cls is there in frame nf
-                            iou = compute_iou(cls_gt_boxes, box) # compute IOU between remaining gt boxes
-                            # and detection boxes
-                            maxid = np.argmax(iou)  # get the max IOU window gt index
-                            if iou[maxid] >= iou_thresh: # check is max IOU is greater than detection threshold
-                                ispositive = True # if yes then this is ture positive detection
-                                cls_gt_boxes = np.delete(cls_gt_boxes, maxid, 0) # remove assigned gt box
-                        scores[det_count] = score # fill score array with score of current detection
-                        if ispositive:
-                            istp[det_count] = 1 # set current detection index (det_count)
-                            #  to 1 if it is true postive example
-                        det_count += 1
+            # if len(gt_boxes[nf])>0 and len(det_boxes[cls_ind][nf]):
+            frame_det_boxes = np.copy(det_boxes[cls_ind][nf]) # get frame detections for class cls in nf
+            cls_gt_boxes = get_gt_of_cls(np.copy(gt_boxes[nf]), cls_ind) # get gt boxes for class cls in nf frame
+            num_postives += cls_gt_boxes.shape[0]
+            if frame_det_boxes.shape[0]>0: # check if there are dection for class cls in nf frame
+                argsort_scores = np.argsort(-frame_det_boxes[:,-1]) # sort in descending order
+                for i, k in enumerate(argsort_scores): # start from best scoring detection of cls to end
+                    box = frame_det_boxes[k, :-1] # detection bounfing box
+                    score = frame_det_boxes[k,-1] # detection score
+                    ispositive = False # set ispostive to false every time
+                    if cls_gt_boxes.shape[0]>0: # we can only find a postive detection
+                        # if there is atleast one gt bounding for class cls is there in frame nf
+                        iou = compute_iou(cls_gt_boxes, box) # compute IOU between remaining gt boxes
+                        # and detection boxes
+                        maxid = np.argmax(iou)  # get the max IOU window gt index
+                        if iou[maxid] >= iou_thresh: # check is max IOU is greater than detection threshold
+                            ispositive = True # if yes then this is ture positive detection
+                            cls_gt_boxes = np.delete(cls_gt_boxes, maxid, 0) # remove assigned gt box
+                    scores[det_count] = score # fill score array with score of current detection
+                    if ispositive:
+                        istp[det_count] = 1 # set current detection index (det_count)
+                        #  to 1 if it is true postive example
+                    det_count += 1
         
         if num_postives<1:
             num_postives =1

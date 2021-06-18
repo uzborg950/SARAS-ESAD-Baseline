@@ -38,7 +38,10 @@ from data.transforms import Resize
 
 parser = argparse.ArgumentParser(description='Training single stage FPN with OHEM, resnet as backbone')
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
-parser.add_argument('--basenet', default='resnet50', help='pretrained base model')
+parser.add_argument('--basenet', default='resnet18', help='pretrained base model')
+# Use LSTM
+parser.add_argument('--append_lstm', default=True, type=str2bool, help='Append lstm layer before flattened retinanet predictor heads')
+#parser.add_argument('--lstm_depth', default=128, type=int, help='Append lstm layer after FCN layers of retinaNet')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
 parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
 parser.add_argument('--shared_heads', default=0, type=int,help='4 head layers')
@@ -55,7 +58,7 @@ parser.add_argument('--batch_size', default=16, type=int, help='Batch size for t
 parser.add_argument('--num_workers', '-j', default=8, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
-parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
+parser.add_argument('--loss_type', default='focal', type=str, help='loss_type')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
 parser.add_argument('--eval_iters', default='5000,6000,7000,9000', type=str, help='Chnage the lr @')
 
@@ -64,7 +67,7 @@ parser.add_argument('--fbn', default=True, type=bool, help='if less than 1 mean 
 parser.add_argument('--freezeupto', default=1, type=int, help='if 0 freeze or else keep updating bn layers')
 
 # Evaluation hyperparameters
-parser.add_argument('--iou_threshs', default='', type=str, help='Evaluation thresholds')
+parser.add_argument('--iou_threshs', default='0.1,0.3,0.5', type=str, help='Evaluation thresholds')
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.5, type=float, help='NMS threshold')
 parser.add_argument('--topk', default=25, type=int, help='topk for evaluation')
@@ -79,9 +82,9 @@ parser.add_argument('--man_seed', default=1, type=int, help='manualseed for repr
 parser.add_argument('--multi_gpu', default=1, type=int, help='If  more than then use all visible GPUs by default only one GPU used ') 
 
 # source or dstination directories
-parser.add_argument('--data_root', default='/mnt/mercury-fast/datasets/', help='Location to root directory fo dataset') # /mnt/mars-fast/datasets/
-parser.add_argument('--save_root', default='/mnt/mercury-alpha/', help='Location to save checkpoint models') # /mnt/sun-gamma/datasets/
-parser.add_argument('--model_dir', default='/mnt/mars-gamma/global-models/pytorch-imagenet/', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
+parser.add_argument('--data_root', default='../', help='Location to root directory fo dataset') # /mnt/mars-fast/datasets/
+parser.add_argument('--save_root', default='..\\checkpoint\\', help='Location to save checkpoint models') # /mnt/sun-gamma/datasets/
+parser.add_argument('--model_dir', default='../pretrain/resnet/', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
 
 
 ## Parse arguments
@@ -100,16 +103,16 @@ def main():
     
     args.exp_name = utils.create_exp_name(args)
 
-    args.data_root += args.dataset+'/'
-    args.save_root += args.dataset+'/'
-    args.save_root += 'cache/'+args.exp_name+'/'
+    args.data_root += args.dataset+'\\'
+    args.save_root += args.dataset+'\\'
+    args.save_root += 'cache\\'+args.exp_name+'\\'
 
 
     val_transform = transforms.Compose([ 
                         Resize(args.min_size, args.max_size),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
-    if False: # while validating
+    if True: # while validating
         val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=False)
     else: # while testing
         val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['testC'], transform=val_transform, full_test=True)
@@ -161,7 +164,7 @@ def main():
         
 
         # print(args.iou_threshs)
-        result_list = validate(args, net, val_data_loader, val_dataset, iteration, submission_file, args.iou_threshs)
+        result_list = validate(args, net, val_data_loader, val_dataset, iteration, submission_file, args.iou_threshs) # finds APs for a number of IoUs
        
         for result in result_list:
             [iou_thresh, mAP, ap_all, ap_strs] = result 
@@ -200,12 +203,12 @@ def main():
         print('Complete set time {:0.2f}'.format(time.perf_counter() - tt0))
         log_file.close()
 
-    result_name = 'results/test-frameAP-{:s}-{:s}-{:d}'.format(args.loss_type, args.basenet, args.min_size)
+    result_name = '../results/test-frameAP-{:s}-{:s}-{:d}'.format(args.loss_type, args.basenet, args.min_size)
 
-    with open(result_name+'.json', 'w') as f:
+    with open(result_name+'.json', 'w+') as f:
         json.dump(overal_json_object,f)
     
-    fid = open(result_name+'.txt', 'w')
+    fid = open(result_name+'.txt', 'w+')
     fid.write('{:s} {:s} {:d}\n'.format(args.loss_type, args.basenet, args.min_size))
     for iter in sorted(overal_json_object.keys()):
         res = overal_json_object[iter]

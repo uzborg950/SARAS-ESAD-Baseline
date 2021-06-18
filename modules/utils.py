@@ -19,6 +19,8 @@ def copy_source(source_dir):
     for dirpath, dirs, files in os.walk('./', topdown=True):
         for file in files:
             if file.endswith('.py'): #fnmatch.filter(files, filepattern):
+                print(os.path.join(dirpath, file))
+                print(source_dir)
                 shutil.copy2(os.path.join(dirpath, file), source_dir)
 
 def set_args(args, iftest='train'):

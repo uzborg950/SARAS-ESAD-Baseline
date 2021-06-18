@@ -1,5 +1,7 @@
-import torch, pdb, math
+import math
 import numpy as np
+import torch
+
 
 def match_anchors(gt_boxes, gt_labels, anchors, iou_threshold=0.5, variances=[0.1, 0.2], seq_len=1):
     # pdb.set_trace()

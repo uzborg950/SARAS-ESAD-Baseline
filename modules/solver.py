@@ -9,7 +9,7 @@ class WarmupMultiStepLR(torch.optim.lr_scheduler._LRScheduler):
         self.milestones = milestones
         self.gammas = gammas
         assert len(gammas) == len(milestones), 'Milestones and gammas should be of same length gammas are of len ' + (len(gammas)) + ' and milestones '+ str(len(milestones))
-        super(WarmupMultiStepLR, self).__init__(optimizer, last_epoch)
+        super(WarmupMultiStepLR, self).__init__(optimizer, last_epoch)#(optimizer, last_epoch)
 
     def get_lr(self):
         if self.last_epoch not in self.milestones:
@@ -18,7 +18,7 @@ class WarmupMultiStepLR(torch.optim.lr_scheduler._LRScheduler):
             index = self.milestones.index(self.last_epoch)
             return [group['lr'] * self.gammas[index] for group in self.optimizer.param_groups]
     
-    def print_lr(self):
+    def print_lr(self, is_verbose, group, lr, epoch=None): #The extra arguments have been added to deal with the new inheritted method in lr_scheduler
         print([[group['name'], group['lr']] for group in self.optimizer.param_groups])
 
 def get_optim(args, net):
@@ -71,7 +71,7 @@ def get_optim(args, net):
         error('Define optimiser type ')
     
     solver_print_str += 'optimizer is '+ args.optim + '\nDone solver configs\n\n'
-
+    
     scheduler = WarmupMultiStepLR(optimizer, args.milestones, args.gammas)
 
     return optimizer, scheduler, solver_print_str

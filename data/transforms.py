@@ -9,8 +9,8 @@ def get_image_list_resized(tensors):
     max_size = tuple(max(s) for s in zip(*[img.shape for img in tensors]))
     stride = 32
     max_size = list(max_size)
-    max_size[1] = int(math.ceil(max_size[1] / stride) * stride)
-    max_size[2] = int(math.ceil(max_size[2] / stride) * stride)
+    #max_size[1] = int(math.ceil(max_size[1] / stride) * stride) No need to resize as all image data are equal size
+    #max_size[2] = int(math.ceil(max_size[2] / stride) * stride)
     max_size = tuple(max_size)
 
     batch_shape = (len(tensors),) + max_size
@@ -44,7 +44,7 @@ class Resize(object):
             if max_size is not None:
                 min_original_size = float(min((w, h)))
                 max_original_size = float(max((w, h)))
-                if max_original_size / min_original_size * size > max_size:
+                if max_original_size / min_original_size * size > max_size: #1920/1080  * 200
                     size = int(round(max_size * min_original_size / max_original_size))
 
             if (w <= h and w == size) or (h <= w and h == size):
