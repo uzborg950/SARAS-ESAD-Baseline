@@ -2,7 +2,7 @@
 
 ### Introduction
 
-The project is a fork of https://github.com/Viveksbawa/SARAS-ESAD-Baseline. It modifies and builds upon the existing RetinaNet architecture and improves its capability of recording temporal information. 
+The project is a fork of https://github.com/Viveksbawa/SARAS-ESAD-Baseline. It modifies and builds upon the existing RetinaNet architecture and extends its capability to record spatiotemporal information. 
 
 ### Primary Features (so far)
 
