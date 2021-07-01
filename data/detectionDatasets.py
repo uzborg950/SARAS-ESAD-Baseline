@@ -60,13 +60,14 @@ def read_labels(image_files, full_test):
     
     return labels
 
-
+def frame_number_sorter(item):
+    return int(item.split("_")[-1].split(".")[0])
 def read_sets(path, input_sets=['train/set1','train/set2'], full_test=False):
     
     all_files=[]
     for set_name in input_sets:
         set_path= path + set_name
-        image_files= glob.glob(set_path+'/*.jpg')
+        image_files= sorted(glob.glob(set_path+'/*.jpg'), key=frame_number_sorter)
         all_files.extend(image_files)
         
     labels= read_labels(all_files, full_test)

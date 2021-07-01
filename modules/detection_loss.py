@@ -230,7 +230,7 @@ class FocalLoss(nn.Module):
             # t0 = time.perf_counter()
             for b in range(len(gts)):
                 gt_boxes = gts[b, :counts[b], :4] #counts size is 2 (in train set 1 as that is the max action count in samples)
-                gt_labels = gts[b, :counts[b], 4]
+                gt_labels = gts[b, :counts[b], 4] #The last dimension holds action classes
                 gt_labels = gt_labels.type(torch.cuda.LongTensor)
 
                 conf, loc = box_utils.match_anchors_wIgnore(gt_boxes, gt_labels, anchors, pos_th=self.positive_threshold, nge_th=self.negative_threshold )

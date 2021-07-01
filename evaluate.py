@@ -39,8 +39,16 @@ from data.transforms import Resize
 parser = argparse.ArgumentParser(description='Training single stage FPN with OHEM, resnet as backbone')
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
 parser.add_argument('--basenet', default='resnet18', help='pretrained base model')
+# Use Time Distribution for CNN backbone
+parser.add_argument('--time_distributed_backbone', default=False, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
+parser.add_argument('--num_timesteps', default=5, type=int, help='Number of timesteps/frame comprising a temporal slice')
 # Use LSTM
-parser.add_argument('--append_lstm', default=True, type=str2bool, help='Append lstm layer before flattened retinanet predictor heads')
+parser.add_argument('--append_temporal_net', default=True, type=str2bool, help='Append temporal model after FPN, before predictor conv head')
+parser.add_argument('--convlstm_layers', default=2, type=int, help='Number of stacked convlstm layers')
+parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
+parser.add_argument('--num_truncated_iterations', default=1, type=int, help='Truncate iterations during BPTT to down-scale computation graph')
+parser.add_argument('--starting_prediction_layer', default=3, type=int, help='The first prediction layer of FPN e.g. 3 for P3, 4 for P4')
+parser.add_argument('--grad_accumulate_iterations', default=1, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations')
 #parser.add_argument('--lstm_depth', default=128, type=int, help='Append lstm layer after FCN layers of retinaNet')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
 parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
