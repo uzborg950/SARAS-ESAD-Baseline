@@ -7,7 +7,7 @@ The project is a fork of https://github.com/Viveksbawa/SARAS-ESAD-Baseline. It m
 ### Dataset
 - 21 action classes
 - YOLO style bounding box coordinate ground truths (center x, center y, width, height)
-[hist_train_set_full.pdf](https://github.com/uzborg950/Surgical-Action-Detection-Using-Deep-Learning-Impl/files/6777924/hist_train_set_full.pdf)
+![hist_train_set_full.pdf](https://github.com/uzborg950/Surgical-Action-Detection-Using-Deep-Learning-Impl/files/6777924/hist_train_set_full.pdf)
 
 
 ### Primary Features (so far)
