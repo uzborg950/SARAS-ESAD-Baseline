@@ -23,7 +23,10 @@ Due to computational limitations, all work is being demonstrated on the followin
 - batch size = 16
 
 ### Demo 
+
 - Temporal layer depth = 2
+- Ground Truth = green
+
 ![ezgif com-gif-maker](https://user-images.githubusercontent.com/16350367/124778681-941e5a80-df5a-11eb-833f-2b2d0e36cb2e.gif)
 
 
