@@ -30,3 +30,13 @@ Due to computational limitations, all work is being demonstrated on the followin
 ![ezgif com-gif-maker](https://user-images.githubusercontent.com/16350367/124778681-941e5a80-df5a-11eb-833f-2b2d0e36cb2e.gif)
 
 
+### Results
+- Early stopping 
+- epochs = 3.40 
+- iterations = 4000
+
+| IOU Threshold | mAP |
+| ------------- | --- |
+| 0.10          | 34.52 |
+| 0.30          | 26.03 |
+| 0.50          | 14.07 |
