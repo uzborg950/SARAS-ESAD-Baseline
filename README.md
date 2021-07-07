@@ -1,3 +1,4 @@
+
 # Surgeon Action Detection for endoscopic images/videos Using Deep Learning (MSc. Artificial Intelligence project)
 
 ### Introduction
@@ -7,7 +8,7 @@ The project is a fork of https://github.com/Viveksbawa/SARAS-ESAD-Baseline. It m
 ### Dataset
 - 21 action classes
 - YOLO style bounding box coordinate ground truths (center x, center y, width, height)
-![hist_train_set_full.pdf](https://github.com/uzborg950/Surgical-Action-Detection-Using-Deep-Learning-Impl/files/6777924/hist_train_set_full.pdf)
+![hist_train_set_full-page-001](https://user-images.githubusercontent.com/16350367/124779586-579f2e80-df5b-11eb-8c3d-93525b243aa0.jpg)
 
 
 ### Primary Features (so far)
