@@ -50,7 +50,7 @@ class anchorBox(torch.nn.Module):
         
     def _get_cell_anchors(self):
         anchors = []
-        for s1 in self.sizes:
+        for s1 in self.sizes: #For each size, we create anchor matrix of size [9,4] [scale*ratio, coords]
             p_anchors = np.asarray(self._gen_generate_anchors_on_one_level(s1))
             p_anchors = torch.FloatTensor(p_anchors).cuda()
             anchors.append(p_anchors)
@@ -76,7 +76,7 @@ class anchorBox(torch.nn.Module):
         anchors[:, 2:] = base_size * np.tile(self.scales, (2, len(self.ratios))).T
 
         # compute areas of anchors
-        areas = anchors[:, 2] * anchors[:, 3]
+        areas = anchors[:, 2] * anchors[:, 3] #2nd and 3rd index contain same elements at each row [32,32],[40,40].. * 9
 
         anchors[:, 2] = np.sqrt(areas / np.repeat(self.ratios, len(self.scales)))
         anchors[:, 3] = anchors[:, 2] * np.repeat(self.ratios, len(self.scales))
@@ -89,16 +89,16 @@ class anchorBox(torch.nn.Module):
     def forward(self, grid_sizes):
         
         anchors = []
-        for size, stride, base_anchors in zip(grid_sizes, self.strides, self.cell_anchors):
+        for size, stride, base_anchors in zip(grid_sizes, self.strides, self.cell_anchors): #For each grid size, we have to resize our base anchors and create new anchors for each stride
             grid_height, grid_width = size
             device = base_anchors.device
             shifts_x = torch.arange(0, grid_width, dtype=torch.float32).cuda()
             shifts_y = torch.arange(0, grid_height, dtype=torch.float32).cuda() 
             shift_y, shift_x = torch.meshgrid(shifts_y, shifts_x) 
-            shift_x = (shift_x.reshape(-1) + 0.5) * stride
+            shift_x = (shift_x.reshape(-1) + 0.5) * stride #Notice in each iteration, with smaller grid sizes, strides are bigger
             shift_y = (shift_y.reshape(-1) + 0.5) * stride
-            shifts = torch.stack((shift_x, shift_y, shift_x, shift_y), dim=1)
-            anchors.append( (shifts.view(-1, 1, 4) + base_anchors.view(1, -1, 4)).reshape(-1, 4) )
+            shifts = torch.stack((shift_x, shift_y, shift_x, shift_y), dim=1) #[grid height x width, 4)
+            anchors.append( (shifts.view(-1, 1, 4) + base_anchors.view(1, -1, 4)).reshape(-1, 4) ) #Resize base anchors based on grid size for each pixel coordinate of image 90450 / (width * height) = 9
 
-        return torch.cat(anchors, 0)
+        return torch.cat(anchors, 0) #The smaller grid sizes have larger strides and fewer anchors
         

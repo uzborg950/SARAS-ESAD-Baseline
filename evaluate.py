@@ -30,13 +30,17 @@ from modules import utils
 from modules.utils import str2bool
 from modules.evaluation import evaluate_detections
 from modules.box_utils import decode, nms
+from modules import frame_utils
 from modules import  AverageMeter
 from data import DetectionDataset, custum_collate
 from models.retinanet_shared_heads import build_retinanet_shared_heads
 from torchvision import transforms
 from data.transforms import Resize
 
+
 parser = argparse.ArgumentParser(description='Training single stage FPN with OHEM, resnet as backbone')
+#Predicted Bounding Box visualisation
+parser.add_argument('--generate_frames', default=False,type=str2bool, help='Generate frame containing GT and predicted bounding boxes')
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
 parser.add_argument('--basenet', default='resnet18', help='pretrained base model')
 # Use Time Distribution for CNN backbone
@@ -44,7 +48,7 @@ parser.add_argument('--time_distributed_backbone', default=False, type=str2bool,
 parser.add_argument('--num_timesteps', default=5, type=int, help='Number of timesteps/frame comprising a temporal slice')
 # Use LSTM
 parser.add_argument('--append_temporal_net', default=True, type=str2bool, help='Append temporal model after FPN, before predictor conv head')
-parser.add_argument('--convlstm_layers', default=2, type=int, help='Number of stacked convlstm layers')
+parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
 parser.add_argument('--num_truncated_iterations', default=1, type=int, help='Truncate iterations during BPTT to down-scale computation graph')
 parser.add_argument('--starting_prediction_layer', default=3, type=int, help='The first prediction layer of FPN e.g. 3 for P3, 4 for P4')
@@ -61,14 +65,14 @@ parser.add_argument('--dataset', default='esad', help='pretrained base model')
 parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
 parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
-parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training')
+parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=8, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--loss_type', default='focal', type=str, help='loss_type')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
-parser.add_argument('--eval_iters', default='5000,6000,7000,9000', type=str, help='Chnage the lr @')
+parser.add_argument('--eval_iters', default='4000', type=str, help='Chnage the lr @')#5000,6000,7000,9000
 
 # Freeze batch normlisatio layer or not 
 parser.add_argument('--fbn', default=True, type=bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
@@ -273,6 +277,9 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
                 conf_scores = conf_scores_all[b]
                 #Apply nms per class and obtain the results
                 decoded_boxes_b = decoded_boxes[b]
+                if args.generate_frames:
+                    ax = frame_utils.generate_frame(images[b].permute(1, 2, 0), targets[b, :, :],
+                                                   None, None,gt=True,show=False)
                 for cl_ind in range(1, num_classes):
                     # pdb.set_trace()
                     scores = conf_scores[:, cl_ind].squeeze()
@@ -294,8 +301,11 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
                     # pick = min(scores.shape[0], 20)
                     # scores = scores[:pick]
                     boxes = boxes[ids[:min(args.topk,counts)]].cpu().numpy()
-
+                    if args.generate_frames and boxes.shape[0] != 0:
+                        ax = frame_utils.generate_frame(images[b].permute(1, 2, 0), torch.cat((torch.tensor(boxes), torch.tensor(cl_ind-1).repeat( boxes.shape[0],1)), axis=1),
+                                                    None, ax)
                     for ik in range(boxes.shape[0]):
+
                         boxes[ik, 0] = max(0, boxes[ik, 0])
                         boxes[ik, 2] = min(width, boxes[ik, 2])
                         boxes[ik, 1] = max(0, boxes[ik, 1])
@@ -303,9 +313,11 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
                         write_string = '{:s} {:0.6f} {:0.6f} {:0.6f} {:0.6f} {:0.6f} {:d}\n'.format(image_name, 
                                         boxes[ik, 0]/width, boxes[ik, 1]/height, boxes[ik, 2]/width, boxes[ik, 3]/height, scores[ik], cl_ind-1)
                         submission_file.write(write_string)
-                    
+
                     cls_dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=True)
                     det_boxes[cl_ind-1].append(cls_dets)
+                if args.generate_frames:
+                    frame_utils.save_image(images[b].permute(1, 2, 0), ax, filename=str((val_itr * batch_size) + b+1) + ".jpg")
                 count += 1
             
             if print_time and val_itr%val_step == 0:

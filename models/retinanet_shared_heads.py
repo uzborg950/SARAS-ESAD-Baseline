@@ -104,7 +104,7 @@ class RetinaNet(nn.Module):
 
         grid_sizes = [feature_map.shape[-2:] for feature_map in
                       features]  # Gets grid size, skips num of planes/channels
-        anchor_boxes = self.anchors(grid_sizes)
+        anchor_boxes = self.anchors(grid_sizes) #Contains anchor boxes at each grid size for each pixel in the image (increasing strides for decreasing grid sizes)
 
         loc = list()
         conf = list()
@@ -124,15 +124,15 @@ class RetinaNet(nn.Module):
                         1)  # For box subnet output of each layer, flattens it while preserving batch size
         conf = torch.cat([o.reshape(o.size(0), -1) for o in conf], 1)
 
-        flat_loc = loc.view(loc.size(0), -1, 4)  # batch size ,x,4
-        flat_conf = conf.view(conf.size(0), -1, self.num_classes)  # batch size ,x,22
+        flat_loc = loc.view(loc.size(0), -1, 4)  # batch size ,x,4 ->  For each pixel of the image and for all anchors at all grid sizes, give coords of box
+        flat_conf = conf.view(conf.size(0), -1, self.num_classes)  # batch size ,x,22 -> For each pixel of the image and for all anchors at all grid sizes, give confidence of action
         # pdb.set_trace()
 
         if get_features:  # testing mode with feature return
             return torch.stack([decode(flat_loc[b], anchor_boxes) for b in range(flat_loc.shape[0])],
                                0), flat_conf, features
         elif gts is not None:  # training mode
-            return self.criterion(flat_conf, flat_loc, gts, counts, anchor_boxes)
+            return self.criterion(flat_conf, flat_loc, gts, counts, anchor_boxes, images)
         else:  # otherwise testing mode
             return torch.stack([decode(flat_loc[b], anchor_boxes) for b in range(flat_loc.shape[0])], 0), flat_conf
 

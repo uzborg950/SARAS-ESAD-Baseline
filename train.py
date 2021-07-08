@@ -57,11 +57,11 @@ parser.add_argument('--time_distributed_backbone', default=False, type=str2bool,
 parser.add_argument('--num_timesteps', default=5, type=int, help='Number of timesteps/frame comprising a temporal slice')
 # Use ConvLSTM
 parser.add_argument('--append_temporal_net', default=True, type=str2bool, help='Append temporal model after FPN, before predictor conv head')
-parser.add_argument('--convlstm_layers', default=2, type=int, help='Number of stacked convlstm layers')
+parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
 parser.add_argument('--num_truncated_iterations', default=1, type=int, help='Truncate iterations during BPTT to down-scale computation graph')
 parser.add_argument('--starting_prediction_layer', default=3, type=int, help='The first prediction layer of FPN e.g. 3 for P3, 4 for P4')
-parser.add_argument('--grad_accumulate_iterations', default=1, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations')
+parser.add_argument('--grad_accumulate_iterations', default=100, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations')
 #parser.add_argument('--lstm_depth', default=198, type=int, help='Append lstm layer after FCN layers of retinaNet')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
 parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
@@ -78,16 +78,16 @@ parser.add_argument('--batch_size', default=2, type=int, help='Batch size for tr
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
-parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
+parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')#SGD
 parser.add_argument('--load_non_strict_pretrained', default=True, type=str2bool, help='Load pretrained weights of partial model')
 parser.add_argument('--freeze_cls_heads', default=False, type=str2bool, help='Freeze training of classification heads (excluding LSTM)')
 parser.add_argument('--freeze_reg_heads', default=False, type=str2bool, help='Freeze training of box regression heads (excluding LSTM)')
 parser.add_argument('--freeze_backbone', default=False, type=str2bool, help='Freeze training of resentFPN')
-parser.add_argument('--pretrained_iter', default=23000, type=int, help='Iteration at which pretraining was stopped')
+parser.add_argument('--pretrained_iter', default=17000, type=int, help='Iteration at which pretraining was stopped') #17000
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
 parser.add_argument('--max_epochs', default=3, type=int, help='Number of epochs to run for')
 parser.add_argument('--max_iter', default=20001, type=int, help='Number of training iterations') #o:9000
-parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate') #0.01
+parser.add_argument('--lr', '--learning-rate', default=0.000001, type=float, help='initial learning rate') #0.01
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--loss_type', default='focal', type=str, help='loss_type')  # o:mbox
 parser.add_argument('--milestones', default='6000,8000,12000,18000', type=str, help='Chnage the lr @')
@@ -180,7 +180,7 @@ def main():
     net = build_retinanet_shared_heads(args).cuda() #The author has hardcoded the use of cuda so i can't use it on cpu.
     
     # print(net)
-    args.multi_gpu = False
+    #args.multi_gpu = False
     if args.multi_gpu:
         print('\nLets do dataparallel\n')
         net = torch.nn.DataParallel(net)
@@ -249,7 +249,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
 
     train_data_loader = data_utils.DataLoader(train_dataset, args.batch_size if args.time_distributed_backbone == False else args.num_timesteps , num_workers=args.num_workers,
-                                  shuffle=True, pin_memory=True, collate_fn=custum_collate, drop_last=True)
+                                  shuffle=False, pin_memory=True, collate_fn=custum_collate, drop_last=True)
 
     
     val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size if args.time_distributed_backbone == False else args.num_timesteps, num_workers=args.num_workers,
@@ -269,7 +269,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     current_cls_loss = {}
     while iteration <= args.max_iter or epoch < args.max_epochs:
         epoch +=1
-        for i, (images, gts, counts, _, _) in enumerate(train_data_loader):
+        for i, (images, gts, counts, image_ids, _) in enumerate(train_data_loader):
             iteration += 1
             #if iteration % 1001 ==0: #Limit timesteps to 1000 for quickly testing learning ability of network
             #    break
@@ -406,7 +406,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                 log_file.write(ptr_str)
 
                 if args.tensorboard:
-                    sw.add_scalar('mAP@0.5', mAP, iteration)
+                    sw.add_scalar('mAP@0.3', mAP, iteration)
                     class_AP_group = dict()
                     for c, ap in enumerate(ap_all):
                         class_AP_group[args.classes[c]] = ap
@@ -423,8 +423,8 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
 def load_model_state_dict(model_file_name, net):
     net_state_dict = torch.load(model_file_name)
-    net_state_dict = {k.replace("module.",""): net_state_dict[k] for k in net_state_dict}
-    net.load_state_dict(net_state_dict, strict=False)
+    #net_state_dict = {k.replace("module.",""): net_state_dict[k] for k in net_state_dict}
+    net.load_state_dict(net_state_dict, strict=True)
 
 
 def param_dict_exists(param_dict, param_dicts):

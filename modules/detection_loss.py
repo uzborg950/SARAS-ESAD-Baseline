@@ -8,8 +8,9 @@ Copyright (c) 2019 Gurkirt Singh
 import torch.nn as nn
 import torch.nn.functional as F
 import torch, pdb, time
-from modules import box_utils
 
+from modules import box_utils
+from modules import frame_utils
 
 def sigmoid_focal_loss(preds, labels, num_pos, alpha, gamma):
     '''Args::
@@ -55,7 +56,7 @@ class MultiBoxLoss(nn.Module):
         self.positive_threshold = positive_threshold
         self.neg_pos_ratio = neg_pos_ratio
 
-    def forward(self, confidence, predicted_locations, gts, counts, anchors):
+    def forward(self, confidence, predicted_locations, gts, counts, anchors, images=None):
         
         
         """
@@ -118,7 +119,7 @@ class YOLOLoss(nn.Module):
         self.neg_weight = 0.5
 
 
-    def forward(self, confidence, predicted_locations, gts, counts, anchors):
+    def forward(self, confidence, predicted_locations, gts, counts, anchors, images=None):
         """
         Compute classification loss and smooth l1 loss.
         Args:
@@ -204,7 +205,7 @@ class FocalLoss(nn.Module):
         self.gamma = 2.0 #Focusing parameter, down weights easy examples (prob -> 1) for gamma > 1
 
 
-    def forward(self, confidence, predicted_locations, gts, counts, anchors):
+    def forward(self, confidence, predicted_locations, gts, counts, anchors, images=None):
         
         """
         
@@ -226,10 +227,13 @@ class FocalLoss(nn.Module):
         labels = []
         labels_bin = []
         with torch.no_grad(): #Gets GT box and classes
-            # torch.cuda.synchronize()
+            torch.cuda.synchronize()
+
             # t0 = time.perf_counter()
+
             for b in range(len(gts)):
-                gt_boxes = gts[b, :counts[b], :4] #counts size is 2 (in train set 1 as that is the max action count in samples)
+                #frame_utils.generate_frame(images[b].permute(1, 2,0), gts[b, :, :], time.strftime("%H-%M-%S", time.localtime())+ ".jpg")
+                gt_boxes = gts[b, :counts[b], :4] # gts[batch, number of actions/counts, regression coords] : counts is a list of size batch size. Each element shows how many actions are in each image
                 gt_labels = gts[b, :counts[b], 4] #The last dimension holds action classes
                 gt_labels = gt_labels.type(torch.cuda.LongTensor)
 
@@ -242,6 +246,7 @@ class FocalLoss(nn.Module):
                 pos_conf[pos_conf<0] = 0 # make ingonre bg
                 y_onehot[range(y_onehot.shape[0]), pos_conf] = 1.0
                 labels.append(y_onehot[:,1:])
+                #labels.append(y_onehot[:, :])
                 labels_bin.append(conf)
             
             gt_locations = torch.stack(gt_locations, 0)
