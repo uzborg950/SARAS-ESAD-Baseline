@@ -40,18 +40,20 @@ from data.transforms import Resize
 
 parser = argparse.ArgumentParser(description='Training single stage FPN with OHEM, resnet as backbone')
 #Predicted Bounding Box visualisation
-parser.add_argument('--generate_frames', default=False,type=str2bool, help='Generate frame containing GT and predicted bounding boxes')
+parser.add_argument('--generate_frames', default=True,type=str2bool, help='Generate frame containing GT and predicted bounding boxes')
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
 parser.add_argument('--basenet', default='resnet18', help='pretrained base model')
+# Multi-Task Surgical Phase Detection
+parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, help='predict surgical phase as well')
+parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')
 # Use Time Distribution for CNN backbone
 parser.add_argument('--time_distributed_backbone', default=False, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
-parser.add_argument('--num_timesteps', default=5, type=int, help='Number of timesteps/frame comprising a temporal slice')
+parser.add_argument('--temporal_slice_timesteps', default=5, type=int, help='Number of timesteps/frame comprising a temporal slice')
 # Use LSTM
 parser.add_argument('--append_temporal_net', default=True, type=str2bool, help='Append temporal model after FPN, before predictor conv head')
 parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
 parser.add_argument('--num_truncated_iterations', default=1, type=int, help='Truncate iterations during BPTT to down-scale computation graph')
-parser.add_argument('--starting_prediction_layer', default=3, type=int, help='The first prediction layer of FPN e.g. 3 for P3, 4 for P4')
 parser.add_argument('--grad_accumulate_iterations', default=1, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations')
 #parser.add_argument('--lstm_depth', default=128, type=int, help='Append lstm layer after FCN layers of retinaNet')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
@@ -61,10 +63,13 @@ parser.add_argument('--num_head_layers', default=4, type=int,help='0 mean no sha
 parser.add_argument('--use_bias', default=True, type=str2bool,help='0 mean no bias in head layears')
 #  Name of the dataset only esad is supported
 parser.add_argument('--dataset', default='esad', help='pretrained base model')
-# Input size of image only 600 is supprted at the moment 
+# Input size of image only 600 is supprted at the moment
+parser.add_argument('--original_width', default=1920, type=int, help='Actual width of input')
+parser.add_argument('--original_height', default=1080, type=int, help='Actual height of input')
 parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
 parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
+parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation')
 parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=8, type=int, help='Number of workers used in dataloading')
@@ -125,7 +130,7 @@ def main():
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
     if True: # while validating
-        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=False)
+        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=True)
     else: # while testing
         val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['testC'], transform=val_transform, full_test=True)
 

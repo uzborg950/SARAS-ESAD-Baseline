@@ -32,6 +32,8 @@ import torch
 import torch.nn as nn
 import torch.utils.data as data_utils
 from torchvision import transforms
+from functools import partial
+
 
 from data import DetectionDataset, custum_collate
 from data.transforms import Resize
@@ -52,16 +54,18 @@ def make_01(v):
 parser = argparse.ArgumentParser(description='Training single stage FPN with Focal, resnet as backbone')
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
 parser.add_argument('--basenet', default='resnet18', help='pretrained base model')
+# Multi-Task Surgical Phase Detection
+parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, help='predict surgical phase as well')
+parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')
 # Use Time Distribution for CNN backbone
-parser.add_argument('--time_distributed_backbone', default=False, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
-parser.add_argument('--num_timesteps', default=5, type=int, help='Number of timesteps/frame comprising a temporal slice')
+parser.add_argument('--time_distributed_backbone', default=True, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
+parser.add_argument('--temporal_slice_timesteps', default=5, type=int, help='Number of timesteps/frame comprising a temporal slice')
 # Use ConvLSTM
 parser.add_argument('--append_temporal_net', default=True, type=str2bool, help='Append temporal model after FPN, before predictor conv head')
 parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
-parser.add_argument('--num_truncated_iterations', default=1, type=int, help='Truncate iterations during BPTT to down-scale computation graph')
-parser.add_argument('--starting_prediction_layer', default=3, type=int, help='The first prediction layer of FPN e.g. 3 for P3, 4 for P4')
-parser.add_argument('--grad_accumulate_iterations', default=100, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations')
+parser.add_argument('--num_truncated_iterations', default=100, type=int, help='Truncate iterations during BPTT to down-scale computation graph')
+parser.add_argument('--grad_accumulate_iterations', default=1, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations')
 #parser.add_argument('--lstm_depth', default=198, type=int, help='Append lstm layer after FCN layers of retinaNet')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
 parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
@@ -70,24 +74,27 @@ parser.add_argument('--num_head_layers', default=4, type=int,help='4 head layers
 parser.add_argument('--use_bias', default=True, type=str2bool,help='0 mean no bias in head layears')
 #  Name of the dataset only voc or coco are supported
 parser.add_argument('--dataset', default='esad', help='pretrained base model')
-# Input size of image only 600 is supprted at the moment 
-parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN') #o: 600
+# Input size of image only 600 is supprted at the moment
+parser.add_argument('--original_width', default=1920, type=int, help='Actual width of input')
+parser.add_argument('--original_height', default=1080, type=int, help='Actual height of input')
+parser.add_argument('--min_size', default=200, type=int, help='Input Size for FPN') #o: 600
 parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
+parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation') 
 parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training') # o:16
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')#SGD
-parser.add_argument('--load_non_strict_pretrained', default=True, type=str2bool, help='Load pretrained weights of partial model')
+parser.add_argument('--load_non_strict_pretrained', default=False, type=str2bool, help='Load pretrained weights of partial model')
 parser.add_argument('--freeze_cls_heads', default=False, type=str2bool, help='Freeze training of classification heads (excluding LSTM)')
 parser.add_argument('--freeze_reg_heads', default=False, type=str2bool, help='Freeze training of box regression heads (excluding LSTM)')
 parser.add_argument('--freeze_backbone', default=False, type=str2bool, help='Freeze training of resentFPN')
-parser.add_argument('--pretrained_iter', default=17000, type=int, help='Iteration at which pretraining was stopped') #17000
+parser.add_argument('--pretrained_iter', default=4000, type=int, help='Iteration at which pretraining was stopped') #17000
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
 parser.add_argument('--max_epochs', default=3, type=int, help='Number of epochs to run for')
 parser.add_argument('--max_iter', default=20001, type=int, help='Number of training iterations') #o:9000
-parser.add_argument('--lr', '--learning-rate', default=0.000001, type=float, help='initial learning rate') #0.01
+parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate') #0.01
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--loss_type', default='focal', type=str, help='loss_type')  # o:mbox
 parser.add_argument('--milestones', default='6000,8000,12000,18000', type=str, help='Chnage the lr @')
@@ -104,7 +111,7 @@ parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min J
 
 # Evaluation hyperparameters
 parser.add_argument('--intial_val', default=5000, type=int, help='Initial number of training iterations before evaluation')
-parser.add_argument('--val_step', default=1000, type=int, help='Number of training iterations before evaluation')
+parser.add_argument('--val_step', default=1, type=int, help='Number of training iterations before evaluation')
 parser.add_argument('--iou_thresh', default=0.30, type=float, help='Evaluation threshold') #For evaluation of val set, just check on AP50
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
@@ -162,14 +169,14 @@ def main():
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means, std=args.stds)])
 
-    train_dataset = DetectionDataset(root= args.data_root, train=True, input_sets=['train/set1','train/set2'], transform=train_transform)
+    train_dataset = DetectionDataset(root= args.data_root, train=True, input_sets=['train/set1','train/set2'], transform=train_transform, include_phase=args.predict_surgical_phase)
     print('Done Loading Dataset Train Dataset :::>>>\n',train_dataset.print_str)
     val_transform = transforms.Compose([ 
                         Resize(args.min_size, args.max_size),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
                         
-    val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=False)
+    val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=False, include_phase=args.predict_surgical_phase)
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
     
     args.num_classes = len(train_dataset.classes) + 1
@@ -236,6 +243,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     losses = AverageMeter()
     loc_losses = AverageMeter()
     cls_losses = AverageMeter()
+    phase_losses = AverageMeter()
 
     # train_dataset = DetectionDatasetDatasetDatasetDatasetDataset(args, 'train', BaseTransform(args.input_dim, args.means, args.stds))
 
@@ -248,12 +256,12 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 #    print('Training FPN on ', train_dataset.dataset,'\n')
 
 
-    train_data_loader = data_utils.DataLoader(train_dataset, args.batch_size if args.time_distributed_backbone == False else args.num_timesteps , num_workers=args.num_workers,
-                                  shuffle=False, pin_memory=True, collate_fn=custum_collate, drop_last=True)
+    train_data_loader = data_utils.DataLoader(train_dataset, args.batch_size if args.time_distributed_backbone == False else args.temporal_slice_timesteps * args.batch_size , num_workers=args.num_workers,
+                                  shuffle=False, pin_memory=True, collate_fn=partial(custum_collate, time_distributed = args.time_distributed_backbone, td_batch_size = args.batch_size), drop_last=True)
 
     
-    val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size if args.time_distributed_backbone == False else args.num_timesteps, num_workers=args.num_workers,
-                                 shuffle=False, pin_memory=True, collate_fn=custum_collate)
+    val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size if args.time_distributed_backbone == False else args.temporal_slice_timesteps * args.batch_size, num_workers=args.num_workers,
+                                 shuffle=False, pin_memory=True, collate_fn=partial(custum_collate, time_distributed = args.time_distributed_backbone, td_batch_size = args.batch_size))
   
     torch.cuda.synchronize()
     start = time.perf_counter()
@@ -273,7 +281,9 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             iteration += 1
             #if iteration % 1001 ==0: #Limit timesteps to 1000 for quickly testing learning ability of network
             #    break
+            '''
             if( args.time_distributed_backbone and batch_fill_count < batch_size):
+                #This hasn't been adapted for phase prediction included gts
                 images_td_batch = cat_timestep(images, images_td_batch)
                 gts_td_batch = cat_timestep(gts, gts_td_batch)
                 counts_td_batch = cat_timestep(counts, counts_td_batch)
@@ -283,7 +293,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                 images = images_td_batch
                 gts = images_td_batch
                 counts = counts_td_batch
-
+            '''
 
             count_update += 1
 
@@ -301,10 +311,19 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             # pdb.set_trace()
             # print(gts.shape, counts.shape, images.shape)
 
+            if args.time_distributed_backbone:
+                _, channels, height, width = images.shape
+                images = construct_temporal_batches(images, batch_size, args.temporal_slice_timesteps)
 
-            loss_l, loss_c = net(images, gts, counts)
+            loss_l, loss_c, loss_p = net(images, gts, counts)
+
             loss_l, loss_c = loss_l.mean() , loss_c.mean()
-            loss = loss_l + loss_c #+ loss
+
+            if args.predict_surgical_phase:
+                loss_p = loss_p.mean()
+                loss = loss_l + loss_c + loss_p  # + loss
+            else:
+                loss = loss_l + loss_c #+ loss
 
             #if count_update - args.num_truncated_iterations == 500:
             #    count_update = 0
@@ -332,14 +351,21 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 #            pdb.set_trace()
             loc_loss = loss_l.item()
             conf_loss = loss_c.item()
+            phase_loss = loss_p.item()
+
             
             if loc_loss>300:
-                lline = '\n\n\n We got faulty LOCATION loss {} {} \n\n\n'.format(loc_loss, conf_loss)
+                lline = '\n\n\n We got faulty LOCATION loss {} {} {} \n\n\n'.format(loc_loss, conf_loss, phase_loss)
                 log_file.write(lline)
                 print(lline)
                 loc_loss = 20.0
             if conf_loss>300:
-                lline = '\n\n\n We got faulty CLASSIFICATION loss {} {} \n\n\n'.format(loc_loss, conf_loss)
+                lline = '\n\n\n We got faulty CLASSIFICATION loss {} {} {} \n\n\n'.format(loc_loss, conf_loss, phase_loss)
+                log_file.write(lline)
+                print(lline)
+                conf_loss = 20.0
+            if phase_loss>300:
+                lline = '\n\n\n We got faulty PHASE loss {} {} {} \n\n\n'.format(loc_loss, conf_loss, phase_loss)
                 log_file.write(lline)
                 print(lline)
                 conf_loss = 20.0
@@ -347,33 +373,35 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             # print('Loss data type ',type(loc_loss))
             loc_losses.update(loc_loss)
             cls_losses.update(conf_loss)
-            losses.update((loc_loss + conf_loss)/2.0)
+            phase_losses.update(phase_loss)
+
+            avg_loss = (loc_loss + conf_loss)/2.0 if not args.predict_surgical_phase else (loc_loss + conf_loss + phase_loss)/3.0
+            losses.update(avg_loss)
 
             torch.cuda.synchronize()
             batch_time.update(time.perf_counter() - start)
             start = time.perf_counter()
 
-            if cls_losses.val in current_cls_loss:
-                current_cls_loss[cls_losses.val] += 1
-            else:
-                current_cls_loss.clear()
-                current_cls_loss[cls_losses.val] = 1
-
-            #if current_cls_loss[cls_losses.val] == 10:
-            #    print("resetting learning rate: ", str(args.lr))
-            #    scheduler.reset_lr(args.lr)
-
-
             if iteration % args.log_step == 0 and iteration > args.log_start:
                 if args.tensorboard:
                     sw.add_scalars('Classification', {'val': cls_losses.val, 'avg':cls_losses.avg},iteration)
                     sw.add_scalars('Localisation', {'val': loc_losses.val, 'avg':loc_losses.avg},iteration)
+                    if args.predict_surgical_phase:
+                        sw.add_scalars('Phase', {'val': phase_losses.val, 'avg': phase_losses.avg}, iteration)
                     sw.add_scalars('Overall', {'val': losses.val, 'avg':losses.avg},iteration)
-                    
-                print_line = 'Itration [{:d}]{:06d}/{:06d} loc-loss {:.2f}({:.2f}) cls-loss {:.2f}({:.2f}) ' \
-                             'average-loss {:.2f}({:.2f}) DataTime{:0.2f}({:0.2f}) Timer {:0.2f}({:0.2f}) batch_iter [{:d}]'.format( epoch,
-                              iteration, args.max_iter, loc_losses.val, loc_losses.avg, cls_losses.val,
-                              cls_losses.avg, losses.val, losses.avg, 10*data_time.val, 10*data_time.avg, 10*batch_time.val, 10*batch_time.avg, i)
+
+                if args.predict_surgical_phase:
+                    print_line = 'Itration [{:d}]{:06d}/{:06d} loc-loss {:.2f}({:.2f}) cls-loss {:.2f}({:.2f}) phase-loss {:.2f}({:.2f}) ' \
+                                 'average-loss {:.2f}({:.2f}) DataTime{:0.2f}({:0.2f}) Timer {:0.2f}({:0.2f})'.format(
+                        epoch,
+                        iteration, args.max_iter, loc_losses.val, loc_losses.avg, cls_losses.val,
+                        cls_losses.avg, phase_losses.val, phase_losses.avg, losses.val, losses.avg, 10 * data_time.val, 10 * data_time.avg,
+                        10 * batch_time.val, 10 * batch_time.avg)
+                else:
+                    print_line = 'Itration [{:d}]{:06d}/{:06d} loc-loss {:.2f}({:.2f}) cls-loss {:.2f}({:.2f}) ' \
+                                 'average-loss {:.2f}({:.2f}) DataTime{:0.2f}({:0.2f}) Timer {:0.2f}({:0.2f})'.format( epoch,
+                                  iteration, args.max_iter, loc_losses.val, loc_losses.avg, cls_losses.val,
+                                  cls_losses.avg, losses.val, losses.avg, 10*data_time.val, 10*data_time.avg, 10*batch_time.val, 10*batch_time.avg)
 
                 log_file.write(print_line+'\n')
                 print(print_line)
@@ -420,6 +448,13 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
     log_file.close()
 
+def construct_temporal_batches(images, batch_size, timesteps):
+    _, channels, height, width = images.shape
+    images_td = torch.tensor([]).cuda()
+    for seq_idx in range(batch_size):
+        seq = images[seq_idx:seq_idx + timesteps, :,:,:]
+        images_td = torch.cat((images_td, torch.unsqueeze(seq, 0)), 0)
+    return images_td
 
 def load_model_state_dict(model_file_name, net):
     net_state_dict = torch.load(model_file_name)
@@ -474,6 +509,11 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, iou_thresh
             batch_size = images.size(0)
 
             images = images.cuda(0, non_blocking=True)
+
+            if args.time_distributed_backbone:
+                _, channels, height, width = images.shape
+                images = construct_temporal_batches(images, args.batch_size, args.temporal_slice_timesteps)
+
             decoded_boxes, conf_data = net(images)
 
             conf_scores_all = activation(conf_data).clone()

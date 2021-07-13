@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch
 from models.convlstm import ConvLSTM
+from models.time_distributed import TimeDistributed
 import math
 
 class ConvLSTMBlock(nn.Module):
@@ -12,10 +13,10 @@ class ConvLSTMBlock(nn.Module):
                                             batch_first=True, bias=bias, return_all_layers=False)
 
     def forward(self, input):
-        out = torch.unsqueeze(input, 0)
-        out = self.convlstm(out)
-        out = torch.squeeze(out[0][0], 0)
-        return out
+        #out = torch.unsqueeze(input, 0)
+        out = self.convlstm(input)
+        #out = torch.squeeze(out[0][0], 0)
+        return out[0][0]
 
     def _make_convlstm(self, input_dim, hidden_dim, kernel_size=(3, 3), num_layers=1, batch_first=True, bias=True,
                        return_all_layers=True):
@@ -28,42 +29,55 @@ class ConvLSTMBlock(nn.Module):
             elif 'weight' in name:
                 nn.init.xavier_normal(param)
         return convlstm
+class TemporalLayer(nn.Module):
+    def __init__(self, inplanes, convlstm_layers, timesteps, use_bias ):
+        super(TemporalLayer, self).__init__()
+        self.inplanes = inplanes
+        self.convlstm = ConvLSTMBlock(inplanes, inplanes, convlstm_layers, use_bias)
+        self.td_conv2d =  TimeDistributed(make_conv2d(inplanes, inplanes, kernel_size=3, stride=1, padding=1, use_bias=use_bias), timesteps)
+        self.td_batchnorm = TimeDistributed(nn.BatchNorm2d(inplanes), timesteps)
+        self.relu = nn.ReLU(True)
+    def forward(self, input):
+        out = self.convlstm(input)
+        out = self.td_conv2d(out)
+        out = self.td_batchnorm(out)
+        out = self.relu(out)
+        return out
+
+
+
+def make_conv2d(inplanes, outplanes, kernel_size, stride=1, padding=1, use_bias=True, init_bg_prob=False):
+    conv = nn.Conv2d(inplanes, outplanes, kernel_size=kernel_size, stride=stride, padding=padding, bias=use_bias)
+
+    nn.init.normal_(conv.weight, mean=0, std=0.01)
+    if hasattr(conv.bias, 'data'):
+        nn.init.constant_(conv.bias, 0)
+
+    if init_bg_prob and hasattr(conv.bias, 'data'):
+        prior_prob = 0.01
+        bias_value = -math.log((1 - prior_prob) / prior_prob)  # focal mentions this initialization in the paper (page 5)
+        nn.init.constant_(conv.bias, bias_value)
+    return conv
 
 class TemporalNet(nn.Module):
-    def __init__(self, inplanes, outplanes, use_bias, init_bg_prob=False, temporal_layers=2, convlstm_layers=1):
+    def __init__(self, inplanes, outplanes, timesteps, use_bias, init_bg_prob=False, temporal_layers=2, convlstm_layers=1):
         super(TemporalNet, self).__init__()
         self.inplanes = inplanes
-        self.temporal_net = self._make_temporal_net(convlstm_layers, inplanes, temporal_layers, use_bias)
+        self.temporal_net = self._make_temporal_net(convlstm_layers, inplanes, temporal_layers, timesteps, use_bias)
 
-        self.conv_head = self._make_conv2d(inplanes, outplanes, kernel_size=3, stride=1, padding=1, use_bias=use_bias,
-                                           init_bg_prob=init_bg_prob)
+        self.td_conv_head = TimeDistributed(make_conv2d(inplanes, outplanes, kernel_size=3, stride=1, padding=1, use_bias=use_bias,
+                                           init_bg_prob=init_bg_prob), timesteps)
 
-    def _make_temporal_net(self, convlstm_layers, inplanes, temporal_layers, use_bias):
+    def _make_temporal_net(self, convlstm_layers, inplanes, temporal_layers, timesteps, use_bias):
         layers = []
         for _ in range(temporal_layers):
-            layers.append(ConvLSTMBlock(inplanes, inplanes, convlstm_layers, use_bias))
-            layers.append(self._make_conv2d(inplanes, inplanes, kernel_size=3, stride=1, padding=1, use_bias=use_bias))
-            layers.append(nn.BatchNorm2d(inplanes))
-            layers.append(nn.ReLU(True))
+            layers.append(TemporalLayer(inplanes,convlstm_layers, timesteps, use_bias))
         net = nn.Sequential(*layers)
         return net
 
-    def _make_conv2d(self, inplanes, outplanes, kernel_size, stride=1, padding=1, use_bias=True, init_bg_prob=False):
-        conv = nn.Conv2d(inplanes, outplanes, kernel_size=kernel_size, stride=stride, padding=padding, bias=use_bias)
-
-        nn.init.normal_(conv.weight, mean=0, std=0.01)
-        if hasattr(conv.bias, 'data'):
-            nn.init.constant_(conv.bias, 0)
-
-        if init_bg_prob and hasattr(conv.bias, 'data'):
-            prior_prob = 0.01
-            bias_value = -math.log((1 - prior_prob) / prior_prob)  # focal mentions this initialization in the paper (page 5)
-            nn.init.constant_(conv.bias, bias_value)
-        return conv
-
     def forward(self, input):
         out = self.temporal_net(input)
-        out = self.conv_head(out)
+        out = self.td_conv_head(out)
         return out
 
     def _conv1x1(self, in_channel, out_channel, bias):

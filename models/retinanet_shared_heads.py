@@ -14,8 +14,11 @@ import torch.nn as nn
 
 from models.backbone_models import backbone_models
 from models.temporal_model import TemporalNet
+from models.phase_model import PhaseNet
 from modules.anchor_box_retinanet import anchorBox
 from modules.box_utils import decode
+import modules.resnet_utils as resnet_utils
+import modules.image_utils as img_utils
 from modules.detection_loss import MultiBoxLoss, YOLOLoss, FocalLoss
 
 
@@ -52,10 +55,11 @@ class RetinaNet(nn.Module):
         self.shared_heads = args.shared_heads
         self.num_head_layers = args.num_head_layers
         self.append_temporal_net = args.append_temporal_net
-        self.predictor_layers = args.predictor_layers
-        self.starting_prediction_layer = args.starting_prediction_layer
         self.convlstm_layers = args.convlstm_layers
         self.temporal_net_layers = args.temporal_net_layers
+        self.include_phase = args.predict_surgical_phase
+        self.temporal_slice_timesteps = args.temporal_slice_timesteps
+        self.num_phases = args.num_phases
 
         assert self.shared_heads < self.num_head_layers, 'number of shared layers should be less than head layers h:' + str(
             self.num_head_layers) + ' sh:' + str(self.shared_heads)
@@ -70,12 +74,14 @@ class RetinaNet(nn.Module):
                                             self.num_head_layers - self.shared_heads)  # class subnet. W x H x KA (K=number of action classes)
 
         else:
-            self.reg_temporal = TemporalNet(self.head_size, self.ar * 4, use_bias=self.use_bias, init_bg_prob=False,
+            self.reg_temporal = TemporalNet(self.head_size, self.ar * 4, self.temporal_slice_timesteps, use_bias=self.use_bias, init_bg_prob=False,
                                             temporal_layers=self.temporal_net_layers,
                                             convlstm_layers=self.convlstm_layers)
-            self.cls_temporal = TemporalNet(self.head_size, self.ar * self.num_classes, use_bias=self.use_bias,
+            self.cls_temporal = TemporalNet(self.head_size, self.ar * self.num_classes, self.temporal_slice_timesteps, use_bias=self.use_bias,
                                             init_bg_prob=True, temporal_layers=self.temporal_net_layers,
                                             convlstm_layers=self.convlstm_layers)
+            if self.include_phase:
+                self.phase_temporal = PhaseNet(self.cls_temporal, self.ar * self.num_classes, args)
 
         if args.loss_type != 'mbox' and not self.append_temporal_net:
             self.prior_prob = 0.01
@@ -88,7 +94,7 @@ class RetinaNet(nn.Module):
             elif args.loss_type == 'yolo':
                 self.criterion = YOLOLoss(args.positive_threshold, args.negative_threshold)
             elif args.loss_type == 'focal':
-                self.criterion = FocalLoss(args.positive_threshold, args.negative_threshold)
+                self.criterion = FocalLoss(args.positive_threshold, args.negative_threshold, include_phase=args.predict_surgical_phase)
             else:
                 error('Define correct loss type')
 
@@ -108,14 +114,18 @@ class RetinaNet(nn.Module):
 
         loc = list()
         conf = list()
+        phases = list()
 
         for x in features:
             if not self.append_temporal_net:
                 reg_out = self.reg_heads(x).permute(0, 2, 3, 1).contiguous()  # 2,25,45,36 (same as P3 w,h)
                 cls_out = self.cls_heads(x).permute(0, 2, 3, 1).contiguous()
             else:
-                reg_out = self.reg_temporal(x).permute(0, 2, 3, 1).contiguous()  # 2,25,45,36 (same as P3 w,h)
-                cls_out = self.cls_temporal(x).permute(0, 2, 3, 1).contiguous()
+                reg_out = self.get_temporal_output(self.reg_temporal , x)
+                reg_out = reg_out.permute(0, 2, 3, 1).contiguous()  # 2,25,45,36 (same as P3 w,h)
+                cls_out = self.get_temporal_output(self.cls_temporal, x)
+                cls_out = cls_out.permute(0, 2, 3, 1).contiguous()
+
 
             loc.append(reg_out)  # batch size, height, width, channels=4*anchors (4*9)
             conf.append(cls_out)  # batch size, height, width, channels=classes*anchors (22*9)
@@ -126,15 +136,24 @@ class RetinaNet(nn.Module):
 
         flat_loc = loc.view(loc.size(0), -1, 4)  # batch size ,x,4 ->  For each pixel of the image and for all anchors at all grid sizes, give coords of box
         flat_conf = conf.view(conf.size(0), -1, self.num_classes)  # batch size ,x,22 -> For each pixel of the image and for all anchors at all grid sizes, give confidence of action
+
+        out_phase = None
+        if self.append_temporal_net and self.include_phase:
+            out_phase = self.phase_temporal(features)
         # pdb.set_trace()
 
         if get_features:  # testing mode with feature return
             return torch.stack([decode(flat_loc[b], anchor_boxes) for b in range(flat_loc.shape[0])],
                                0), flat_conf, features
         elif gts is not None:  # training mode
-            return self.criterion(flat_conf, flat_loc, gts, counts, anchor_boxes, images)
+            return self.criterion(flat_conf, flat_loc, gts, counts, anchor_boxes, images, predicted_phase=out_phase)
         else:  # otherwise testing mode
             return torch.stack([decode(flat_loc[b], anchor_boxes) for b in range(flat_loc.shape[0])], 0), flat_conf
+
+    def get_temporal_output(self, temporal_net, x):
+        out = temporal_net(x)
+        batch, timesteps, channels, height, width = out.shape
+        return out.view(batch * timesteps, channels, height, width)
 
     def make_features(self, shared_heads):
         layers = []

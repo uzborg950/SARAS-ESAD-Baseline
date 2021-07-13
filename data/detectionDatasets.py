@@ -20,7 +20,7 @@ from PIL import Image, ImageDraw
 import glob
 import pdb
 
-def read_file(path, full_test):
+def read_file(path, full_test, include_phase):
     try:
         with open(path, 'r') as f:
             lines = f.readlines()
@@ -43,18 +43,22 @@ def read_file(path, full_test):
 
     out_data = []
     for line in lines:
-        line_entries = [float(entry) for entry in line]
+        if include_phase and len(line) == 1:
+            line_entries = [float(line[0]), -1.0, -1.0, -1.0, -1.0]
+        elif len(line) == 5:
+            line_entries = [float(entry) for entry in line]
+
         line_entries = [line_entries[1], line_entries[2], line_entries[3], line_entries[4], line_entries[0]]
         out_data.append(line_entries)
     
     return out_data
 
-def read_labels(image_files, full_test):
+def read_labels(image_files, full_test, include_phase):
     labels=[]
     
     for img_path in image_files:
         label_file = img_path.replace('.jpg', '.txt')
-        label= read_file(label_file, full_test)
+        label= read_file(label_file, full_test, include_phase=include_phase)
         if label is not None:
             labels.append([img_path, label])
     
@@ -62,7 +66,7 @@ def read_labels(image_files, full_test):
 
 def frame_number_sorter(item):
     return int(item.split("_")[-1].split(".")[0])
-def read_sets(path, input_sets=['train/set1','train/set2'], full_test=False):
+def read_sets(path, input_sets=['train/set1','train/set2'], full_test=False, include_phase=False):
     
     all_files=[]
     for set_name in input_sets:
@@ -70,12 +74,12 @@ def read_sets(path, input_sets=['train/set1','train/set2'], full_test=False):
         image_files= sorted(glob.glob(set_path+'/*.jpg'), key=frame_number_sorter)
         all_files.extend(image_files)
         
-    labels= read_labels(all_files, full_test)
+    labels= read_labels(all_files, full_test, include_phase=include_phase)
     print('length of labels', len(labels))
     return(labels)
     
             
-def make_object_lists(rootpath, input_sets=['train/set1','train/set2'], full_test=False):
+def make_object_lists(rootpath, input_sets=['train/set1','train/set2'], full_test=False, include_phase= False):
     '''
 
     input_sets has be a list of set needs tobe read : 
@@ -89,7 +93,7 @@ def make_object_lists(rootpath, input_sets=['train/set1','train/set2'], full_tes
 
     cls_list = [name for name in cls_list if len(name)>0]
     
-    final_labels= read_sets(rootpath, input_sets, full_test)
+    final_labels= read_sets(rootpath, input_sets, full_test, include_phase=include_phase)
         
     return(cls_list, final_labels)
 
@@ -102,15 +106,15 @@ def resize(image, size):
 class DetectionDataset(data.Dataset):
     """Detection Dataset class for pytorch dataloader"""
 
-    def __init__(self, root, train=False, input_sets=['train/set1','train/set2'], transform=None, anno_transform=None, full_test=False):
-
+    def __init__(self, root, train=False, input_sets=['train/set1','train/set2'], transform=None, anno_transform=None, full_test=False, include_phase=False):
+        self.include_phase = include_phase
         self.train = train
         self.root= root
         self.input_sets = input_sets
         self.transform = transform
         self.anno_transform = anno_transform
         self.ids = list()
-        self.classes, self.ids = make_object_lists(self.root, input_sets=input_sets, full_test=full_test)
+        self.classes, self.ids = make_object_lists(self.root, input_sets=input_sets, full_test=full_test, include_phase=self.include_phase)
         self.print_str= ''
         self.max_targets = 20
         
@@ -123,6 +127,11 @@ class DetectionDataset(data.Dataset):
         
         img_path = annot_info[0]
         bbox_info = np.array(annot_info[1]) #shape: (G, 5) , G is the number of actions in frame. 5 is box coords (4) + action class(1)
+        phase = -1
+        if self.include_phase:
+            phase = bbox_info[-1,:]
+            bbox_info = bbox_info[:-1,:]
+
         labels= bbox_info[:,4] #Gets action ids in the frame
 
         x1= bbox_info[:,0] - bbox_info[:,2]/2 #Upper left x 
@@ -157,26 +166,35 @@ class DetectionDataset(data.Dataset):
         boxes[:, 3] *= height # height y2
 
         targets = np.hstack((boxes, np.expand_dims(labels, axis=1)))
+        if(self.include_phase):
+            targets = np.vstack((targets, np.expand_dims(phase, axis=0)))
         return img, targets, index, wh
-        
 
-def custum_collate(batch): #batch size 16
+
+def custum_collate(batch, time_distributed=None, td_batch_size=None):  # batch size 16
     targets = []
     images = []
     image_ids = []
     whs = []
     # fno = []
     # rgb_images, flow_images, aug_bxsl, prior_labels, prior_gt_locations, num_mt, index
-    
-    for sample in batch:
+    phase_included = True if batch[0][1][-1][0] == -1 else False #-1 bbox coords means phase entry
+    for idx, sample in enumerate(batch):
         images.append(sample[0]) #Pixel values stored in tensor are added to a list
-        targets.append(torch.FloatTensor(sample[1])) #
+        #if time_distributed:
+        #    if idx < td_batch_size:
+        #        targets.append(torch.FloatTensor(sample[1]))
+        #else:
+        targets.append(torch.FloatTensor(sample[1]))
+
         image_ids.append(sample[2]) #Index while iterating total list of samples (randomized iteration)
         whs.append(sample[3]) #[width (1067), height (600), orig_w (1920), orig_h (1080)] (same for all tensors)
     
     counts = []
     max_len = -1
     for target in targets:
+        #num_actions = target.shape[0] - 1 if phase_included else target.shape[0]
+
         max_len = max(max_len, target.shape[0]) #Max actions a sample could have in the whole dataset
         counts.append(target.shape[0]) #Stores number of action classes in each sample
     new_targets = torch.zeros(len(targets), max_len, targets[0].shape[1]) #shape (16 (targets/batch size),2 (max actions in a sample),5 (box coords + class))
@@ -188,6 +206,8 @@ def custum_collate(batch): #batch size 16
     #images_ = images
     cts = torch.LongTensor(counts)
     # print(images_.shape)
+
+
     return images_, new_targets, cts, image_ids, whs
 
 # if __name__== '__main__':

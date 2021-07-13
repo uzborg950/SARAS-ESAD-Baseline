@@ -12,6 +12,12 @@ import torch, pdb, time
 from modules import box_utils
 from modules import frame_utils
 
+
+def cross_entropy_loss(pred, target):
+    ce_loss = nn.CrossEntropyLoss()
+    loss = ce_loss(pred, target)
+    return loss
+
 def sigmoid_focal_loss(preds, labels, num_pos, alpha, gamma):
     '''Args::
         preds: sigmoid activated predictions
@@ -56,7 +62,7 @@ class MultiBoxLoss(nn.Module):
         self.positive_threshold = positive_threshold
         self.neg_pos_ratio = neg_pos_ratio
 
-    def forward(self, confidence, predicted_locations, gts, counts, anchors, images=None):
+    def forward(self, confidence, predicted_locations, gts, counts, anchors, images=None, predicted_phase=None):
         
         
         """
@@ -119,7 +125,7 @@ class YOLOLoss(nn.Module):
         self.neg_weight = 0.5
 
 
-    def forward(self, confidence, predicted_locations, gts, counts, anchors, images=None):
+    def forward(self, confidence, predicted_locations, gts, counts, anchors, images=None, predicted_phase=None):
         """
         Compute classification loss and smooth l1 loss.
         Args:
@@ -192,7 +198,7 @@ class YOLOLoss(nn.Module):
 
 
 class FocalLoss(nn.Module):
-    def __init__(self, positive_threshold, negative_threshold, alpha=0.25, gamma=2.0):
+    def __init__(self, positive_threshold, negative_threshold, alpha=0.25, gamma=2.0, include_phase= False):
         """Implement focal Loss.
         Basically, combines focal classification loss
          and Smooth L1 regression loss.
@@ -203,9 +209,9 @@ class FocalLoss(nn.Module):
         # self.bce_loss = nn.BCELoss(reduction='sum').cuda()
         self.alpha = 0.25 #Weighs positive/negative examples
         self.gamma = 2.0 #Focusing parameter, down weights easy examples (prob -> 1) for gamma > 1
+        self.include_phase = include_phase
 
-
-    def forward(self, confidence, predicted_locations, gts, counts, anchors, images=None):
+    def forward(self, confidence, predicted_locations, gts, counts, anchors, images=None, predicted_phase=None):
         
         """
         
@@ -226,6 +232,7 @@ class FocalLoss(nn.Module):
         gt_locations = []
         labels = []
         labels_bin = []
+        gt_phases = []
         with torch.no_grad(): #Gets GT box and classes
             torch.cuda.synchronize()
 
@@ -233,8 +240,14 @@ class FocalLoss(nn.Module):
 
             for b in range(len(gts)):
                 #frame_utils.generate_frame(images[b].permute(1, 2,0), gts[b, :, :], time.strftime("%H-%M-%S", time.localtime())+ ".jpg")
-                gt_boxes = gts[b, :counts[b], :4] # gts[batch, number of actions/counts, regression coords] : counts is a list of size batch size. Each element shows how many actions are in each image
-                gt_labels = gts[b, :counts[b], 4] #The last dimension holds action classes
+                if self.include_phase:
+                    gt_phases.append(gts[b, -1, 4])
+                    num_actions = counts[b] - 1
+                else:
+                    num_actions = counts[b]
+
+                gt_boxes = gts[b, :num_actions, :4] # gts[batch, number of actions/counts, regression coords] : counts is a list of size batch size. Each element shows how many actions are in each image
+                gt_labels = gts[b, :num_actions, 4] #The last dimension holds action classes
                 gt_labels = gt_labels.type(torch.cuda.LongTensor)
 
                 conf, loc = box_utils.match_anchors_wIgnore(gt_boxes, gt_labels, anchors, pos_th=self.positive_threshold, nge_th=self.negative_threshold )
@@ -248,7 +261,10 @@ class FocalLoss(nn.Module):
                 labels.append(y_onehot[:,1:])
                 #labels.append(y_onehot[:, :])
                 labels_bin.append(conf)
-            
+
+            if self.include_phase:
+                gt_phases = torch.stack(gt_phases, 0)
+                gt_phases = gt_phases.long()
             gt_locations = torch.stack(gt_locations, 0)
             labels = torch.stack(labels, 0)
             labels_bin = torch.stack(labels_bin, 0)
@@ -266,6 +282,13 @@ class FocalLoss(nn.Module):
 
         classification_loss = sigmoid_focal_loss(object_preds, labels, num_pos, self.alpha, self.gamma)
 
+        #Dummy value for when include phase is false
+        phase_loss = torch.tensor(0)
+        if self.include_phase:
+            phase_loss = cross_entropy_loss(predicted_phase, gt_phases)
+        #object_preds = object_preds.reshape(-1,num_classes)
+        #phase_loss = phase_loss(object_preds)
+
         #COMMENTED THIS OUT BECAUSE NOT SURE WHY THIS IS DONE
         #labels_bin[labels_bin>0] = 1
         #binary_preds = binary_preds[labels_bin>-1]
@@ -275,4 +298,6 @@ class FocalLoss(nn.Module):
         #COMMENTED THIS OUT BECAUSE I've REMOVED binary loss
         #return localisation_loss, (classification_loss + binary_loss)/2.0
 
-        return localisation_loss, classification_loss
+        return localisation_loss, classification_loss, phase_loss
+
+

@@ -34,11 +34,12 @@ def set_args(args, iftest='train'):
     args.dataset = args.dataset.lower()
     args.basenet = args.basenet.lower()
 
-    #args.means =[0.485, 0.456, 0.406]
-    #args.stds = [0.229, 0.224, 0.225]
-
-    args.means = [0, 0, 0]
-    args.stds = [1, 1, 1]
+    if args.shifted_mean:
+        args.means =[0.485, 0.456, 0.406]
+        args.stds = [0.229, 0.224, 0.225]
+    else:
+        args.means = [0, 0, 0]
+        args.stds = [1, 1, 1]
 
     username = getpass.getuser()
     hostname = socket.gethostname()

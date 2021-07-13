@@ -3,22 +3,23 @@ import torch
 import copy
 ''' Converts entire network into Time Distributed layer'''
 class TimeDistributed(nn.Module):
-    def __init__(self, net, timesteps ):
+    def __init__(self, net, timesteps, fpn=False ):
         super(TimeDistributed, self).__init__()
         self.timesteps = timesteps
         self.td_net = net
-        #td_nets = self.create_time_distributed_nets(net, timesteps)
+        self.fpn = fpn
 
-    def create_time_distributed_nets(self, net, timesteps):
-        td_nets = []
-        td_nets.extend([copy.deepcopy(net) for _ in range(timesteps)])
-        return td_nets
 
     def forward(self, input):
         batch_size, timesteps, channels, height, width = input.shape
-        output = torch.tensor([]).cuda()
-        for t in range(self.timesteps):
-            output_t = self.td_net(input[:,t,:,:,:])
-            output_t = torch.unsqueeze(output_t, 1)
-            output = torch.cat((output, output_t), 1)
-        return output
+        input = input.view(batch_size * timesteps, channels, height, width).contiguous()
+        output = self.td_net(input)
+        if self.fpn:
+            resized_output = []
+            for idx, FPN_output in enumerate(output):
+                _, channels, height, width = FPN_output.shape
+                resized_output.append(FPN_output.view(batch_size, timesteps, channels, height, width))
+            return resized_output
+        else:
+            _, channels, height, width = output.shape
+            return output.view(batch_size, timesteps, channels, height, width)

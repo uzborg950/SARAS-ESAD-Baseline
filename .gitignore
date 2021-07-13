@@ -17,3 +17,5 @@ __pycache__/
 
 #directories
 results/
+
+*.jpg
