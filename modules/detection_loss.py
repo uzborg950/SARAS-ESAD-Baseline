@@ -225,7 +225,7 @@ class FocalLoss(nn.Module):
         """
 
         confidence = torch.sigmoid(confidence)
-        #binary_preds = confidence[:,:, 0]
+        binary_preds = confidence[:,:, 0]
         object_preds = confidence[:,:,1:] #[2, x, 21]
         num_classes = object_preds.size(2)
         N = float(len(gts))
@@ -283,21 +283,22 @@ class FocalLoss(nn.Module):
         classification_loss = sigmoid_focal_loss(object_preds, labels, num_pos, self.alpha, self.gamma)
 
         #Dummy value for when include phase is false
-        phase_loss = torch.tensor(0)
+        torch.cuda.synchronize()
+        phase_loss = torch.tensor(0.0).cuda()
         if self.include_phase:
             phase_loss = cross_entropy_loss(predicted_phase, gt_phases)
         #object_preds = object_preds.reshape(-1,num_classes)
         #phase_loss = phase_loss(object_preds)
 
         #COMMENTED THIS OUT BECAUSE NOT SURE WHY THIS IS DONE
-        #labels_bin[labels_bin>0] = 1
-        #binary_preds = binary_preds[labels_bin>-1]
-        #labels_bin = labels_bin[labels_bin>-1]
-        #binary_loss = sigmoid_focal_loss(binary_preds.float(), labels_bin.float(), num_pos, self.alpha, self.gamma)
+        labels_bin[labels_bin>0] = 1
+        binary_preds = binary_preds[labels_bin>-1]
+        labels_bin = labels_bin[labels_bin>-1]
+        binary_loss = sigmoid_focal_loss(binary_preds.float(), labels_bin.float(), num_pos, self.alpha, self.gamma)
 
         #COMMENTED THIS OUT BECAUSE I've REMOVED binary loss
-        #return localisation_loss, (classification_loss + binary_loss)/2.0
+        return localisation_loss, (classification_loss + binary_loss)/2.0, phase_loss
 
-        return localisation_loss, classification_loss, phase_loss
+        #return localisation_loss, classification_loss, phase_loss
 
 

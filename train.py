@@ -35,7 +35,7 @@ from torchvision import transforms
 from functools import partial
 
 
-from data import DetectionDataset, custum_collate
+from data import DetectionDataset, custom_collate
 from data.transforms import Resize
 from models.retinanet_shared_heads import build_retinanet_shared_heads
 from modules import AverageMeter
@@ -58,10 +58,10 @@ parser.add_argument('--basenet', default='resnet18', help='pretrained base model
 parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, help='predict surgical phase as well')
 parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')
 # Use Time Distribution for CNN backbone
-parser.add_argument('--time_distributed_backbone', default=True, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
-parser.add_argument('--temporal_slice_timesteps', default=5, type=int, help='Number of timesteps/frame comprising a temporal slice')
+parser.add_argument('--time_distributed_backbone', default=False, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
+parser.add_argument('--temporal_slice_timesteps', default=4, type=int, help='Number of timesteps/frame comprising a temporal slice')
 # Use ConvLSTM
-parser.add_argument('--append_temporal_net', default=True, type=str2bool, help='Append temporal model after FPN, before predictor conv head')
+parser.add_argument('--append_temporal_net', default=False, type=str2bool, help='Append temporal model after FPN, before predictor conv head')
 parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
 parser.add_argument('--num_truncated_iterations', default=100, type=int, help='Truncate iterations during BPTT to down-scale computation graph')
@@ -80,8 +80,9 @@ parser.add_argument('--original_height', default=1080, type=int, help='Actual he
 parser.add_argument('--min_size', default=200, type=int, help='Input Size for FPN') #o: 600
 parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
-parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation') 
-parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training') # o:16
+parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation')
+parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training') # o:16
+parser.add_argument('--shuffle', default=False, type=str2bool, help='Shuffle training data')
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
@@ -111,7 +112,7 @@ parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min J
 
 # Evaluation hyperparameters
 parser.add_argument('--intial_val', default=5000, type=int, help='Initial number of training iterations before evaluation')
-parser.add_argument('--val_step', default=1, type=int, help='Number of training iterations before evaluation')
+parser.add_argument('--val_step', default=1000, type=int, help='Number of training iterations before evaluation')
 parser.add_argument('--iou_thresh', default=0.30, type=float, help='Evaluation threshold') #For evaluation of val set, just check on AP50
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
@@ -256,12 +257,12 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 #    print('Training FPN on ', train_dataset.dataset,'\n')
 
 
-    train_data_loader = data_utils.DataLoader(train_dataset, args.batch_size if args.time_distributed_backbone == False else args.temporal_slice_timesteps * args.batch_size , num_workers=args.num_workers,
-                                  shuffle=False, pin_memory=True, collate_fn=partial(custum_collate, time_distributed = args.time_distributed_backbone, td_batch_size = args.batch_size), drop_last=True)
+    train_data_loader = data_utils.DataLoader(train_dataset, args.batch_size if not args.time_distributed_backbone else args.temporal_slice_timesteps + args.temporal_slice_timesteps - 1, num_workers=args.num_workers,
+                                              shuffle=False, pin_memory=True, collate_fn=partial(custom_collate, timesteps = args.batch_size if not args.time_distributed_backbone else args.temporal_slice_timesteps + args.temporal_slice_timesteps - 1 ), drop_last=True)
 
     
-    val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size if args.time_distributed_backbone == False else args.temporal_slice_timesteps * args.batch_size, num_workers=args.num_workers,
-                                 shuffle=False, pin_memory=True, collate_fn=partial(custum_collate, time_distributed = args.time_distributed_backbone, td_batch_size = args.batch_size))
+    val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size if not args.time_distributed_backbone else args.temporal_slice_timesteps + args.temporal_slice_timesteps - 1, num_workers=args.num_workers,
+                                            shuffle=False, pin_memory=True, collate_fn=partial(custom_collate, timesteps = args.batch_size if not args.time_distributed_backbone else args.temporal_slice_timesteps + args.temporal_slice_timesteps - 1 ))
   
     torch.cuda.synchronize()
     start = time.perf_counter()
@@ -317,10 +318,9 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
             loss_l, loss_c, loss_p = net(images, gts, counts)
 
-            loss_l, loss_c = loss_l.mean() , loss_c.mean()
+            loss_l, loss_c, loss_p = loss_l.mean(), loss_c.mean(), loss_p.mean()
 
             if args.predict_surgical_phase:
-                loss_p = loss_p.mean()
                 loss = loss_l + loss_c + loss_p  # + loss
             else:
                 loss = loss_l + loss_c #+ loss

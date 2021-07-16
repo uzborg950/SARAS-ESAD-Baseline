@@ -1,7 +1,7 @@
 from .resnetFPN import resnetfpn
 import torch
 import pdb
-from models.time_distributed import TimeDistributed
+from models.time_distributed import TimeDistributed5D
 def backbone_models(modelname, model_dir, use_bias, args):
 
     if modelname[:6] == 'resnet':
@@ -15,5 +15,5 @@ def backbone_models(modelname, model_dir, use_bias, args):
             load_dict = torch.load(model_dir + modelname+'.pth')
             model.load_my_state_dict(load_dict)
         if args.time_distributed_backbone:
-            model = TimeDistributed(model, args.temporal_slice_timesteps, fpn = True)
+            model = TimeDistributed5D(model, args.temporal_slice_timesteps, fpn = True)
         return model

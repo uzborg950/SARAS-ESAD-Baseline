@@ -47,6 +47,8 @@ def read_file(path, full_test, include_phase):
             line_entries = [float(line[0]), -1.0, -1.0, -1.0, -1.0]
         elif len(line) == 5:
             line_entries = [float(entry) for entry in line]
+        else:
+            continue
 
         line_entries = [line_entries[1], line_entries[2], line_entries[3], line_entries[4], line_entries[0]]
         out_data.append(line_entries)
@@ -171,7 +173,7 @@ class DetectionDataset(data.Dataset):
         return img, targets, index, wh
 
 
-def custum_collate(batch, time_distributed=None, td_batch_size=None):  # batch size 16
+def custom_collate(batch, timesteps):  # batch size 16
     targets = []
     images = []
     image_ids = []
@@ -189,7 +191,11 @@ def custum_collate(batch, time_distributed=None, td_batch_size=None):  # batch s
 
         image_ids.append(sample[2]) #Index while iterating total list of samples (randomized iteration)
         whs.append(sample[3]) #[width (1067), height (600), orig_w (1920), orig_h (1080)] (same for all tensors)
-    
+    for i in range(timesteps - len(batch)): #Repeat the last image to fill batch (consistency required for model expecting sequences (timesteps) of frames)
+        images.append(images[-1].clone())
+        targets.append(targets[-1].clone())
+        image_ids.append(image_ids[-1])
+        whs.append(whs[-1])
     counts = []
     max_len = -1
     for target in targets:

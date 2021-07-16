@@ -32,11 +32,11 @@ from modules.evaluation import evaluate_detections
 from modules.box_utils import decode, nms
 from modules import frame_utils
 from modules import  AverageMeter
-from data import DetectionDataset, custum_collate
+from data import DetectionDataset, custom_collate
 from models.retinanet_shared_heads import build_retinanet_shared_heads
 from torchvision import transforms
 from data.transforms import Resize
-
+from functools import partial
 
 parser = argparse.ArgumentParser(description='Training single stage FPN with OHEM, resnet as backbone')
 #Predicted Bounding Box visualisation
@@ -48,9 +48,9 @@ parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, he
 parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')
 # Use Time Distribution for CNN backbone
 parser.add_argument('--time_distributed_backbone', default=False, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
-parser.add_argument('--temporal_slice_timesteps', default=5, type=int, help='Number of timesteps/frame comprising a temporal slice')
+parser.add_argument('--temporal_slice_timesteps', default=4, type=int, help='Number of timesteps/frame comprising a temporal slice')
 # Use LSTM
-parser.add_argument('--append_temporal_net', default=True, type=str2bool, help='Append temporal model after FPN, before predictor conv head')
+parser.add_argument('--append_temporal_net', default=False, type=str2bool, help='Append temporal model after FPN, before predictor conv head')
 parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
 parser.add_argument('--num_truncated_iterations', default=1, type=int, help='Truncate iterations during BPTT to down-scale computation graph')
@@ -66,7 +66,7 @@ parser.add_argument('--dataset', default='esad', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment
 parser.add_argument('--original_width', default=1920, type=int, help='Actual width of input')
 parser.add_argument('--original_height', default=1080, type=int, help='Actual height of input')
-parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
+parser.add_argument('--min_size', default=200, type=int, help='Input Size for FPN')
 parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation')
@@ -77,7 +77,7 @@ parser.add_argument('--num_workers', '-j', default=8, type=int, help='Number of 
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--loss_type', default='focal', type=str, help='loss_type')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
-parser.add_argument('--eval_iters', default='4000', type=str, help='Chnage the lr @')#5000,6000,7000,9000
+parser.add_argument('--eval_iters', default='9000', type=str, help='Chnage the lr @')#5000,6000,7000,9000
 
 # Freeze batch normlisatio layer or not 
 parser.add_argument('--fbn', default=True, type=bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
@@ -130,9 +130,9 @@ def main():
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
     if True: # while validating
-        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=True)
+        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=True, include_phase=args.predict_surgical_phase)
     else: # while testing
-        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['testC'], transform=val_transform, full_test=True)
+        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['testC'], transform=val_transform, full_test=True, include_phase=args.predict_surgical_phase)
 
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
 
@@ -170,8 +170,8 @@ def main():
 
         print('Finished loading model %d !' % iteration)
         # Load dataset
-        val_data_loader = data_utils.DataLoader(val_dataset, int(args.batch_size), num_workers=args.num_workers,
-                                 shuffle=False, pin_memory=True, collate_fn=custum_collate)
+        val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size if not args.time_distributed_backbone else args.temporal_slice_timesteps + args.temporal_slice_timesteps - 1, num_workers=args.num_workers,
+                                                shuffle=False, pin_memory=True, collate_fn=partial(custom_collate, timesteps = args.batch_size if not args.time_distributed_backbone else args.temporal_slice_timesteps + args.temporal_slice_timesteps - 1))
 
         # evaluation
         torch.cuda.synchronize()
@@ -262,6 +262,11 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
             batch_size = images.size(0)
 
             images = images.cuda(0, non_blocking=True)
+
+            if args.time_distributed_backbone:
+                _, channels, height, width = images.shape
+                images = construct_temporal_batches(images, args.batch_size, args.temporal_slice_timesteps)
+
             decoded_boxes, conf_data = net(images)
 
             conf_scores_all = activation(conf_data).clone()
@@ -270,7 +275,11 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
                 torch.cuda.synchronize()
                 tf = time.perf_counter()
                 print('Forward Time {:0.3f}'.format(tf-t1))
-            
+
+            if args.time_distributed_backbone: #merge batch size and timesteps for analysis operations (generate frames) of batch
+                images = images.view(images.shape[0] * images.shape[1], images.shape[2], images.shape[3],
+                                     images.shape[4])
+
             for b in range(batch_size):
                 image_path = val_dataset.ids[img_indexs[b]][0]
                 image_name = image_path.split('/')[-1]
@@ -282,6 +291,8 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
                 conf_scores = conf_scores_all[b]
                 #Apply nms per class and obtain the results
                 decoded_boxes_b = decoded_boxes[b]
+
+
                 if args.generate_frames:
                     ax = frame_utils.generate_frame(images[b].permute(1, 2, 0), targets[b, :, :],
                                                    None, None,gt=True,show=False)
@@ -308,7 +319,7 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
                     boxes = boxes[ids[:min(args.topk,counts)]].cpu().numpy()
                     if args.generate_frames and boxes.shape[0] != 0:
                         ax = frame_utils.generate_frame(images[b].permute(1, 2, 0), torch.cat((torch.tensor(boxes), torch.tensor(cl_ind-1).repeat( boxes.shape[0],1)), axis=1),
-                                                    None, ax)
+                                                    None, ax, show=False)
                     for ik in range(boxes.shape[0]):
 
                         boxes[ik, 0] = max(0, boxes[ik, 0])
@@ -344,6 +355,14 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
         mAP, ap_all, ap_strs , _ = evaluate_detections(gt_boxes, det_boxes, val_dataset.classes, iou_thresh=iou_thresh)
         return_list.append([iou_thresh, mAP, ap_all, ap_strs])
     return return_list 
+
+def construct_temporal_batches(images, batch_size, timesteps):
+    _, channels, height, width = images.shape
+    images_td = torch.tensor([]).cuda()
+    for seq_idx in range(batch_size):
+        seq = images[seq_idx:seq_idx + timesteps, :,:,:]
+        images_td = torch.cat((images_td, torch.unsqueeze(seq, 0)), 0)
+    return images_td
 
 if __name__ == '__main__':
     main()

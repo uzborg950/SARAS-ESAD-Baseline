@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 from models.convlstm import ConvLSTM
-from models.time_distributed import TimeDistributed
+from models.time_distributed import TimeDistributed5D
 import math
 
 class ConvLSTMBlock(nn.Module):
@@ -34,8 +34,8 @@ class TemporalLayer(nn.Module):
         super(TemporalLayer, self).__init__()
         self.inplanes = inplanes
         self.convlstm = ConvLSTMBlock(inplanes, inplanes, convlstm_layers, use_bias)
-        self.td_conv2d =  TimeDistributed(make_conv2d(inplanes, inplanes, kernel_size=3, stride=1, padding=1, use_bias=use_bias), timesteps)
-        self.td_batchnorm = TimeDistributed(nn.BatchNorm2d(inplanes), timesteps)
+        self.td_conv2d =  TimeDistributed5D(make_conv2d(inplanes, inplanes, kernel_size=3, stride=1, padding=1, use_bias=use_bias), timesteps)
+        self.td_batchnorm = TimeDistributed5D(nn.BatchNorm2d(inplanes), timesteps)
         self.relu = nn.ReLU(True)
     def forward(self, input):
         out = self.convlstm(input)
@@ -65,7 +65,7 @@ class TemporalNet(nn.Module):
         self.inplanes = inplanes
         self.temporal_net = self._make_temporal_net(convlstm_layers, inplanes, temporal_layers, timesteps, use_bias)
 
-        self.td_conv_head = TimeDistributed(make_conv2d(inplanes, outplanes, kernel_size=3, stride=1, padding=1, use_bias=use_bias,
+        self.td_conv_head = TimeDistributed5D(make_conv2d(inplanes, outplanes, kernel_size=3, stride=1, padding=1, use_bias=use_bias,
                                            init_bg_prob=init_bg_prob), timesteps)
 
     def _make_temporal_net(self, convlstm_layers, inplanes, temporal_layers, timesteps, use_bias):
