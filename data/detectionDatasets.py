@@ -180,15 +180,10 @@ def custom_collate(batch, timesteps):  # batch size 16
     whs = []
     # fno = []
     # rgb_images, flow_images, aug_bxsl, prior_labels, prior_gt_locations, num_mt, index
-    phase_included = True if batch[0][1][-1][0] == -1 else False #-1 bbox coords means phase entry
-    for idx, sample in enumerate(batch):
-        images.append(sample[0]) #Pixel values stored in tensor are added to a list
-        #if time_distributed:
-        #    if idx < td_batch_size:
-        #        targets.append(torch.FloatTensor(sample[1]))
-        #else:
-        targets.append(torch.FloatTensor(sample[1]))
 
+    for sample in batch:
+        images.append(sample[0])
+        targets.append(torch.FloatTensor(sample[1]))
         image_ids.append(sample[2]) #Index while iterating total list of samples (randomized iteration)
         whs.append(sample[3]) #[width (1067), height (600), orig_w (1920), orig_h (1080)] (same for all tensors)
     for i in range(timesteps - len(batch)): #Repeat the last image to fill batch (consistency required for model expecting sequences (timesteps) of frames)
@@ -199,8 +194,6 @@ def custom_collate(batch, timesteps):  # batch size 16
     counts = []
     max_len = -1
     for target in targets:
-        #num_actions = target.shape[0] - 1 if phase_included else target.shape[0]
-
         max_len = max(max_len, target.shape[0]) #Max actions a sample could have in the whole dataset
         counts.append(target.shape[0]) #Stores number of action classes in each sample
     new_targets = torch.zeros(len(targets), max_len, targets[0].shape[1]) #shape (16 (targets/batch size),2 (max actions in a sample),5 (box coords + class))
@@ -212,8 +205,6 @@ def custom_collate(batch, timesteps):  # batch size 16
     #images_ = images
     cts = torch.LongTensor(counts)
     # print(images_.shape)
-
-
     return images_, new_targets, cts, image_ids, whs
 
 # if __name__== '__main__':

@@ -197,8 +197,16 @@ class YOLOLoss(nn.Module):
         return localisation_loss, (classification_loss + binary_loss)/2.0
 
 
+def generate_timestep_phases(gts, timesteps):
+    batch_size = gts.shape[0] - timesteps + 1
+    timestep_gts = torch.tensor([], dtype=torch.int64).cuda()
+    for seq_idx in range(batch_size):
+        timestep_gts = torch.cat((timestep_gts, gts[seq_idx:seq_idx + timesteps]))
+    return timestep_gts
+
+
 class FocalLoss(nn.Module):
-    def __init__(self, positive_threshold, negative_threshold, alpha=0.25, gamma=2.0, include_phase= False):
+    def __init__(self, positive_threshold, negative_threshold, alpha=0.25, gamma=2.0, include_phase= False, temporal_slice_timesteps = 4):
         """Implement focal Loss.
         Basically, combines focal classification loss
          and Smooth L1 regression loss.
@@ -210,6 +218,7 @@ class FocalLoss(nn.Module):
         self.alpha = 0.25 #Weighs positive/negative examples
         self.gamma = 2.0 #Focusing parameter, down weights easy examples (prob -> 1) for gamma > 1
         self.include_phase = include_phase
+        self.temporal_slice_timesteps = temporal_slice_timesteps
 
     def forward(self, confidence, predicted_locations, gts, counts, anchors, images=None, predicted_phase=None):
         
@@ -284,8 +293,9 @@ class FocalLoss(nn.Module):
 
         #Dummy value for when include phase is false
         torch.cuda.synchronize()
-        phase_loss = torch.tensor(0.0).cuda()
+        phase_loss = None
         if self.include_phase:
+            #gt_phases = generate_timestep_phases(gt_phases, self.temporal_slice_timesteps)
             phase_loss = cross_entropy_loss(predicted_phase, gt_phases)
         #object_preds = object_preds.reshape(-1,num_classes)
         #phase_loss = phase_loss(object_preds)
@@ -297,8 +307,10 @@ class FocalLoss(nn.Module):
         binary_loss = sigmoid_focal_loss(binary_preds.float(), labels_bin.float(), num_pos, self.alpha, self.gamma)
 
         #COMMENTED THIS OUT BECAUSE I've REMOVED binary loss
-        return localisation_loss, (classification_loss + binary_loss)/2.0, phase_loss
-
+        if self.include_phase:
+            return localisation_loss, (classification_loss + binary_loss)/2.0, phase_loss
+        else:
+            return localisation_loss, (classification_loss + binary_loss)/2.0, None
         #return localisation_loss, classification_loss, phase_loss
 
 

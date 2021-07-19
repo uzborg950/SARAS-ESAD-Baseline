@@ -81,8 +81,8 @@ parser.add_argument('--min_size', default=200, type=int, help='Input Size for FP
 parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation')
-parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training') # o:16
-parser.add_argument('--shuffle', default=False, type=str2bool, help='Shuffle training data')
+parser.add_argument('--batch_size', default=4, type=int, help='Batch size for training') # o:16
+parser.add_argument('--shuffle', default=True, type=str2bool, help='Shuffle training data')
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
@@ -204,6 +204,15 @@ def main():
     train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_print_str)
 
 
+def generate_temporal_gts(gts, counts, batch_size, timesteps):
+    timestep_gts = torch.tensor([], dtype=torch.int64).cuda()
+    timestep_counts = torch.tensor([], dtype=torch.int64).cuda()
+    for seq_idx in range(batch_size):
+        timestep_gts = torch.cat((timestep_gts, gts[seq_idx:seq_idx + timesteps]))
+        timestep_counts = torch.cat((timestep_counts, counts[seq_idx:seq_idx + timesteps]))
+    return timestep_gts, timestep_counts
+
+
 def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_print_str):
     
     args.start_iteration = 0
@@ -257,12 +266,12 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 #    print('Training FPN on ', train_dataset.dataset,'\n')
 
 
-    train_data_loader = data_utils.DataLoader(train_dataset, args.batch_size if not args.time_distributed_backbone else args.temporal_slice_timesteps + args.temporal_slice_timesteps - 1, num_workers=args.num_workers,
-                                              shuffle=False, pin_memory=True, collate_fn=partial(custom_collate, timesteps = args.batch_size if not args.time_distributed_backbone else args.temporal_slice_timesteps + args.temporal_slice_timesteps - 1 ), drop_last=True)
+    train_data_loader = data_utils.DataLoader(train_dataset, args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1, num_workers=args.num_workers,
+                                              shuffle=args.shuffle, pin_memory=True, collate_fn=partial(custom_collate, timesteps = args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1 ), drop_last=True)
 
     
-    val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size if not args.time_distributed_backbone else args.temporal_slice_timesteps + args.temporal_slice_timesteps - 1, num_workers=args.num_workers,
-                                            shuffle=False, pin_memory=True, collate_fn=partial(custom_collate, timesteps = args.batch_size if not args.time_distributed_backbone else args.temporal_slice_timesteps + args.temporal_slice_timesteps - 1 ))
+    val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1, num_workers=args.num_workers,
+                                            shuffle=args.shuffle, pin_memory=True, collate_fn=partial(custom_collate, timesteps = args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1 ))
   
     torch.cuda.synchronize()
     start = time.perf_counter()
@@ -315,12 +324,14 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             if args.time_distributed_backbone:
                 _, channels, height, width = images.shape
                 images = construct_temporal_batches(images, batch_size, args.temporal_slice_timesteps)
+                gts, counts = generate_temporal_gts(gts, counts, batch_size, args.temporal_slice_timesteps)
 
             loss_l, loss_c, loss_p = net(images, gts, counts)
 
-            loss_l, loss_c, loss_p = loss_l.mean(), loss_c.mean(), loss_p.mean()
+            loss_l, loss_c = loss_l.mean(), loss_c.mean()
 
             if args.predict_surgical_phase:
+                loss_p = loss_p.mean()
                 loss = loss_l + loss_c + loss_p  # + loss
             else:
                 loss = loss_l + loss_c #+ loss
@@ -351,7 +362,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 #            pdb.set_trace()
             loc_loss = loss_l.item()
             conf_loss = loss_c.item()
-            phase_loss = loss_p.item()
+            phase_loss = loss_p.item() if loss_p is not None else 0.0
 
             
             if loc_loss>300:
@@ -513,6 +524,7 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, iou_thresh
             if args.time_distributed_backbone:
                 _, channels, height, width = images.shape
                 images = construct_temporal_batches(images, args.batch_size, args.temporal_slice_timesteps)
+                gts, counts = generate_temporal_gts(gts, batch_counts, args.batch_size, args.temporal_slice_timesteps)
 
             decoded_boxes, conf_data = net(images)
 

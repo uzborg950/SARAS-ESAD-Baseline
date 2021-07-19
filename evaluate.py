@@ -170,8 +170,8 @@ def main():
 
         print('Finished loading model %d !' % iteration)
         # Load dataset
-        val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size if not args.time_distributed_backbone else args.temporal_slice_timesteps + args.temporal_slice_timesteps - 1, num_workers=args.num_workers,
-                                                shuffle=False, pin_memory=True, collate_fn=partial(custom_collate, timesteps = args.batch_size if not args.time_distributed_backbone else args.temporal_slice_timesteps + args.temporal_slice_timesteps - 1))
+        val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1, num_workers=args.num_workers,
+                                                shuffle=False, pin_memory=True, collate_fn=partial(custom_collate, timesteps = args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1))
 
         # evaluation
         torch.cuda.synchronize()
@@ -266,6 +266,8 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
             if args.time_distributed_backbone:
                 _, channels, height, width = images.shape
                 images = construct_temporal_batches(images, args.batch_size, args.temporal_slice_timesteps)
+                gts, counts = generate_temporal_gts(gts, batch_counts, args.batch_size, args.temporal_slice_timesteps)
+
 
             decoded_boxes, conf_data = net(images)
 
@@ -364,5 +366,12 @@ def construct_temporal_batches(images, batch_size, timesteps):
         images_td = torch.cat((images_td, torch.unsqueeze(seq, 0)), 0)
     return images_td
 
+def generate_temporal_gts(gts, counts, batch_size, timesteps):
+    timestep_gts = torch.tensor([], dtype=torch.int64).cuda()
+    timestep_counts = torch.tensor([], dtype=torch.int64).cuda()
+    for seq_idx in range(batch_size):
+        timestep_gts = torch.cat((timestep_gts, gts[seq_idx:seq_idx + timesteps]))
+        timestep_counts = torch.cat((timestep_counts, counts[seq_idx:seq_idx + timesteps]))
+    return timestep_gts, timestep_counts
 if __name__ == '__main__':
     main()
