@@ -96,7 +96,7 @@ class RetinaNet(nn.Module):
             elif args.loss_type == 'yolo':
                 self.criterion = YOLOLoss(args.positive_threshold, args.negative_threshold)
             elif args.loss_type == 'focal':
-                self.criterion = FocalLoss(args.positive_threshold, args.negative_threshold, include_phase=args.predict_surgical_phase, temporal_slice_timesteps=self.temporal_slice_timesteps)
+                self.criterion = FocalLoss(args.positive_threshold, args.negative_threshold, include_phase=args.predict_surgical_phase, temporal_slice_timesteps=self.temporal_slice_timesteps, bin_loss = args.bin_loss)
             else:
                 error('Define correct loss type')
 

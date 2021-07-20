@@ -43,6 +43,8 @@ parser = argparse.ArgumentParser(description='Training single stage FPN with OHE
 parser.add_argument('--generate_frames', default=True,type=str2bool, help='Generate frame containing GT and predicted bounding boxes')
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
 parser.add_argument('--basenet', default='resnet18', help='pretrained base model')
+#Binary classification loss
+parser.add_argument('--bin_loss', default=False, help='Include binary classification loss (object/background')
 # Multi-Task Surgical Phase Detection
 parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, help='predict surgical phase as well')
 parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')

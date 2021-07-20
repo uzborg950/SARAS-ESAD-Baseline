@@ -206,7 +206,7 @@ def generate_timestep_phases(gts, timesteps):
 
 
 class FocalLoss(nn.Module):
-    def __init__(self, positive_threshold, negative_threshold, alpha=0.25, gamma=2.0, include_phase= False, temporal_slice_timesteps = 4):
+    def __init__(self, positive_threshold, negative_threshold, alpha=0.25, gamma=2.0, include_phase= False, temporal_slice_timesteps = 4, bin_loss=False):
         """Implement focal Loss.
         Basically, combines focal classification loss
          and Smooth L1 regression loss.
@@ -219,6 +219,7 @@ class FocalLoss(nn.Module):
         self.gamma = 2.0 #Focusing parameter, down weights easy examples (prob -> 1) for gamma > 1
         self.include_phase = include_phase
         self.temporal_slice_timesteps = temporal_slice_timesteps
+        self.include_bin_loss = bin_loss
 
     def forward(self, confidence, predicted_locations, gts, counts, anchors, images=None, predicted_phase=None):
         
@@ -308,9 +309,12 @@ class FocalLoss(nn.Module):
 
         #COMMENTED THIS OUT BECAUSE I've REMOVED binary loss
         if self.include_phase:
-            return localisation_loss, (classification_loss + binary_loss)/2.0, phase_loss
+            return localisation_loss, self.get_cls_loss(binary_loss, classification_loss), phase_loss
         else:
-            return localisation_loss, (classification_loss + binary_loss)/2.0, None
+            return localisation_loss, self.get_cls_loss(binary_loss, classification_loss), None
         #return localisation_loss, classification_loss, phase_loss
+
+    def get_cls_loss(self, binary_loss, classification_loss):
+        return (classification_loss + binary_loss) / 2.0 if self.include_bin_loss else classification_loss
 
 
