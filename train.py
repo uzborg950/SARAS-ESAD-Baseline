@@ -55,15 +55,15 @@ parser = argparse.ArgumentParser(description='Training single stage FPN with Foc
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
 parser.add_argument('--basenet', default='resnet18', help='pretrained base model')
 #Binary classification loss
-parser.add_argument('--bin_loss', default=False, help='Include binary classification loss (object/background')
+parser.add_argument('--bin_loss', default=True, type=str2bool, help='Include binary classification loss (object/background')
 # Multi-Task Surgical Phase Detection
 parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, help='predict surgical phase as well')
 parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')
 # Use Time Distribution for CNN backbone
-parser.add_argument('--time_distributed_backbone', default=False, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
+parser.add_argument('--time_distributed_backbone', default=True, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
 parser.add_argument('--temporal_slice_timesteps', default=4, type=int, help='Number of timesteps/frame comprising a temporal slice')
 # Use ConvLSTM
-parser.add_argument('--append_temporal_net', default=False, type=str2bool, help='Append temporal model after FPN, before predictor conv head')
+parser.add_argument('--append_temporal_net', default=True, type=str2bool, help='Append temporal model after FPN, before predictor conv head')
 parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
 parser.add_argument('--num_truncated_iterations', default=100, type=int, help='Truncate iterations during BPTT to down-scale computation graph')
@@ -114,7 +114,7 @@ parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min J
 
 # Evaluation hyperparameters
 parser.add_argument('--intial_val', default=5000, type=int, help='Initial number of training iterations before evaluation')
-parser.add_argument('--val_step', default=1000, type=int, help='Number of training iterations before evaluation')
+parser.add_argument('--val_step', default=1, type=int, help='Number of training iterations before evaluation')
 parser.add_argument('--iou_thresh', default=0.30, type=float, help='Evaluation threshold') #For evaluation of val set, just check on AP50
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
@@ -207,8 +207,8 @@ def main():
 
 
 def generate_temporal_gts(gts, counts, batch_size, timesteps):
-    timestep_gts = torch.tensor([], dtype=torch.int64).cuda()
-    timestep_counts = torch.tensor([], dtype=torch.int64).cuda()
+    timestep_gts = torch.tensor([], dtype=torch.int64)
+    timestep_counts = torch.tensor([], dtype=torch.int64)
     for seq_idx in range(batch_size):
         timestep_gts = torch.cat((timestep_gts, gts[seq_idx:seq_idx + timesteps]))
         timestep_counts = torch.cat((timestep_counts, counts[seq_idx:seq_idx + timesteps]))
@@ -309,6 +309,12 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
             count_update += 1
 
+
+            if args.time_distributed_backbone:
+                _, channels, height, width = images.shape
+                images = construct_temporal_batches(images, batch_size, args.temporal_slice_timesteps)
+                gts, counts = generate_temporal_gts(gts, counts, batch_size, args.temporal_slice_timesteps)
+
 #            pdb.set_trace()
             #epoch = int(iteration/num_bpe)
             images = images.cuda(0, non_blocking=True)
@@ -322,11 +328,6 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
             # pdb.set_trace()
             # print(gts.shape, counts.shape, images.shape)
-
-            if args.time_distributed_backbone:
-                _, channels, height, width = images.shape
-                images = construct_temporal_batches(images, batch_size, args.temporal_slice_timesteps)
-                gts, counts = generate_temporal_gts(gts, counts, batch_size, args.temporal_slice_timesteps)
 
             loss_l, loss_c, loss_p = net(images, gts, counts)
 
@@ -463,7 +464,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
 def construct_temporal_batches(images, batch_size, timesteps):
     _, channels, height, width = images.shape
-    images_td = torch.tensor([]).cuda()
+    images_td = torch.tensor([])
     for seq_idx in range(batch_size):
         seq = images[seq_idx:seq_idx + timesteps, :,:,:]
         images_td = torch.cat((images_td, torch.unsqueeze(seq, 0)), 0)
@@ -521,12 +522,14 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, iou_thresh
 
             batch_size = images.size(0)
 
-            images = images.cuda(0, non_blocking=True)
-
             if args.time_distributed_backbone:
                 _, channels, height, width = images.shape
                 images = construct_temporal_batches(images, args.batch_size, args.temporal_slice_timesteps)
-                gts, counts = generate_temporal_gts(gts, batch_counts, args.batch_size, args.temporal_slice_timesteps)
+                targets, counts = generate_temporal_gts(targets, batch_counts, args.batch_size, args.temporal_slice_timesteps)
+
+            images = images.cuda(0, non_blocking=True)
+
+
 
             decoded_boxes, conf_data = net(images)
 

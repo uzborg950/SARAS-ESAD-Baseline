@@ -44,7 +44,7 @@ parser.add_argument('--generate_frames', default=True,type=str2bool, help='Gener
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
 parser.add_argument('--basenet', default='resnet18', help='pretrained base model')
 #Binary classification loss
-parser.add_argument('--bin_loss', default=False, help='Include binary classification loss (object/background')
+parser.add_argument('--bin_loss', default=False, type=str2bool,help='Include binary classification loss (object/background')
 # Multi-Task Surgical Phase Detection
 parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, help='predict surgical phase as well')
 parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')
@@ -105,6 +105,10 @@ parser.add_argument('--data_root', default='../', help='Location to root directo
 parser.add_argument('--save_root', default='..\\checkpoint\\', help='Location to save checkpoint models') # /mnt/sun-gamma/datasets/
 parser.add_argument('--model_dir', default='../pretrain/resnet/', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
 
+#Set params for loading model (Params that aren't used in actual testing but are used while loading particular model from filesystem)
+parser.add_argument('--positive_threshold', default=0.5, type=float, help='Min Jaccard index for matching')
+parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min Jaccard index for matching')
+parser.add_argument('--shuffle', default=True, type=str2bool, help='Shuffle training data')
 
 ## Parse arguments
 args = parser.parse_args()
@@ -263,12 +267,14 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
 
             batch_size = images.size(0)
 
-            images = images.cuda(0, non_blocking=True)
-
             if args.time_distributed_backbone:
                 _, channels, height, width = images.shape
                 images = construct_temporal_batches(images, args.batch_size, args.temporal_slice_timesteps)
-                gts, counts = generate_temporal_gts(gts, batch_counts, args.batch_size, args.temporal_slice_timesteps)
+                targets, counts = generate_temporal_gts(targets, batch_counts, args.batch_size, args.temporal_slice_timesteps)
+
+            images = images.cuda(0, non_blocking=True)
+
+
 
 
             decoded_boxes, conf_data = net(images)
@@ -362,15 +368,15 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
 
 def construct_temporal_batches(images, batch_size, timesteps):
     _, channels, height, width = images.shape
-    images_td = torch.tensor([]).cuda()
+    images_td = torch.tensor([])
     for seq_idx in range(batch_size):
         seq = images[seq_idx:seq_idx + timesteps, :,:,:]
         images_td = torch.cat((images_td, torch.unsqueeze(seq, 0)), 0)
     return images_td
 
 def generate_temporal_gts(gts, counts, batch_size, timesteps):
-    timestep_gts = torch.tensor([], dtype=torch.int64).cuda()
-    timestep_counts = torch.tensor([], dtype=torch.int64).cuda()
+    timestep_gts = torch.tensor([], dtype=torch.int64)
+    timestep_counts = torch.tensor([], dtype=torch.int64)
     for seq_idx in range(batch_size):
         timestep_gts = torch.cat((timestep_gts, gts[seq_idx:seq_idx + timesteps]))
         timestep_counts = torch.cat((timestep_counts, counts[seq_idx:seq_idx + timesteps]))
