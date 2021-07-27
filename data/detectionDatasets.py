@@ -57,14 +57,20 @@ def read_file(path, full_test, include_phase):
 
 def read_labels(image_files, full_test, include_phase):
     labels=[]
-    
+    input_set_sizes = []
+    count = 0
     for img_path in image_files:
+        if img_path == -1:
+            input_set_sizes.append(count)
+            count = 0
+            continue
         label_file = img_path.replace('.jpg', '.txt')
         label= read_file(label_file, full_test, include_phase=include_phase)
         if label is not None:
             labels.append([img_path, label])
+            count +=1
     
-    return labels
+    return labels, input_set_sizes
 
 def frame_number_sorter(item):
     return int(item.split("_")[-1].split(".")[0])
@@ -75,10 +81,12 @@ def read_sets(path, input_sets=['train/set1','train/set2'], full_test=False, inc
         set_path= path + set_name
         image_files= sorted(glob.glob(set_path+'/*.jpg'), key=frame_number_sorter)
         all_files.extend(image_files)
+        all_files.append(-1)
         
-    labels= read_labels(all_files, full_test, include_phase=include_phase)
+    labels, input_set_sizes = read_labels(all_files, full_test, include_phase=include_phase)
+
     print('length of labels', len(labels))
-    return(labels)
+    return(labels, input_set_sizes)
     
             
 def make_object_lists(rootpath, input_sets=['train/set1','train/set2'], full_test=False, include_phase= False):
@@ -95,9 +103,9 @@ def make_object_lists(rootpath, input_sets=['train/set1','train/set2'], full_tes
 
     cls_list = [name for name in cls_list if len(name)>0]
     
-    final_labels= read_sets(rootpath, input_sets, full_test, include_phase=include_phase)
+    final_labels, input_set_sizes = read_sets(rootpath, input_sets, full_test, include_phase=include_phase)
         
-    return(cls_list, final_labels)
+    return(cls_list, final_labels, input_set_sizes)
 
 
 def resize(image, size):
@@ -108,7 +116,7 @@ def resize(image, size):
 class DetectionDataset(data.Dataset):
     """Detection Dataset class for pytorch dataloader"""
 
-    def __init__(self, root, train=False, input_sets=['train/set1','train/set2'], transform=None, anno_transform=None, full_test=False, include_phase=False):
+    def __init__(self, root, train=False, input_sets=['train/set1','train/set2'], transform=None, anno_transform=None, full_test=False, include_phase=False, args=None):
         self.include_phase = include_phase
         self.train = train
         self.root= root
@@ -116,7 +124,7 @@ class DetectionDataset(data.Dataset):
         self.transform = transform
         self.anno_transform = anno_transform
         self.ids = list()
-        self.classes, self.ids = make_object_lists(self.root, input_sets=input_sets, full_test=full_test, include_phase=self.include_phase)
+        self.classes, self.ids, self.input_set_sizes = make_object_lists(self.root, input_sets=input_sets, full_test=full_test, include_phase=self.include_phase)
         self.print_str= ''
         self.max_targets = 20
         

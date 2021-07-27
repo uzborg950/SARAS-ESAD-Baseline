@@ -76,13 +76,13 @@ class RetinaNet(nn.Module):
                                             self.num_head_layers - self.shared_heads, self.time_distributed_backbone, init_bg_prob = args.loss_type != 'mbox')  # class subnet. W x H x KA (K=number of action classes)
 
         else:
-            self.reg_temporal = TemporalNet(self.head_size, self.ar * 4, self.temporal_slice_timesteps, use_bias=self.use_bias, init_bg_prob=False,
+            self.reg_temporal = [TemporalNet(self.head_size, self.ar * 4, self.temporal_slice_timesteps, use_bias=self.use_bias, init_bg_prob=False,
                                             temporal_layers=self.temporal_net_layers,
-                                            convlstm_layers=self.convlstm_layers)
-            self.cls_temporal = TemporalNet(self.head_size, self.ar * self.num_classes, self.temporal_slice_timesteps, use_bias=self.use_bias,
+                                            convlstm_layers=self.convlstm_layers) for _ in args.predictor_layers]
+            self.cls_temporal = [TemporalNet(self.head_size, self.ar * self.num_classes, self.temporal_slice_timesteps, use_bias=self.use_bias,
                                             init_bg_prob=True, temporal_layers=self.temporal_net_layers,
-                                            convlstm_layers=self.convlstm_layers)
-            if self.include_phase:
+                                            convlstm_layers=self.convlstm_layers) for _ in args.predictor_layers]
+            if self.include_phase: #TODO ADAPT FOR MULTIPLE TEMPORAL NETS
                 self.phase_temporal = PhaseNet(self.cls_temporal, self.ar * self.num_classes, args)
 
         #if args.loss_type != 'mbox' and not self.append_temporal_net:
@@ -100,7 +100,7 @@ class RetinaNet(nn.Module):
             else:
                 error('Define correct loss type')
 
-    def forward(self, images, gts=None, counts=None, get_features=False):
+    def forward(self, images, gts=None, counts=None, get_features=False, reset_hidden=False):
         sources = self.backbone_net(images)
         features = list()
         # pdb.set_trace()
@@ -118,7 +118,7 @@ class RetinaNet(nn.Module):
         conf = list()
         phases = list()
 
-        for x in features:
+        for idx, x in enumerate(features):
             if not self.append_temporal_net:
                 if self.time_distributed_backbone:
                     reg_out = self.collate_timesteps(self.reg_heads(x))
@@ -127,8 +127,8 @@ class RetinaNet(nn.Module):
                     reg_out = self.reg_heads(x)  # 2,25,45,36 (same as P3 w,h)
                     cls_out = self.cls_heads(x)
             else:
-                reg_out = self.get_temporal_output(self.reg_temporal , x)
-                cls_out = self.get_temporal_output(self.cls_temporal, x)
+                reg_out = self.get_temporal_output(self.reg_temporal[idx] , x, reset_hidden)
+                cls_out = self.get_temporal_output(self.cls_temporal[idx], x, reset_hidden)
 
 
             reg_out = reg_out.permute(0, 2, 3, 1).contiguous()
@@ -168,8 +168,8 @@ class RetinaNet(nn.Module):
 
         return out.view(batch * timesteps, channels, height, width)
 
-    def get_temporal_output(self, temporal_net, x):
-        out = temporal_net(x)
+    def get_temporal_output(self, temporal_net, x, reset_hidden):
+        out = temporal_net(x, reset_hidden)
         return self.collate_timesteps(out)
 
     def make_features(self, shared_heads):

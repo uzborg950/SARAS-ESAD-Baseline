@@ -26,6 +26,7 @@ import argparse
 import datetime
 import os
 import time
+import math
 
 import numpy as np
 import torch
@@ -68,6 +69,7 @@ parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of st
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
 parser.add_argument('--num_truncated_iterations', default=100, type=int, help='Truncate iterations during BPTT to down-scale computation graph')
 parser.add_argument('--grad_accumulate_iterations', default=1, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations')
+parser.add_argument('--enable_variable_grad_accumulation', default=True, type=str2bool, help='Configure gradient accumulation across full train sets of variable sizes')
 #parser.add_argument('--lstm_depth', default=198, type=int, help='Append lstm layer after FCN layers of retinaNet')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
 parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
@@ -83,8 +85,9 @@ parser.add_argument('--min_size', default=200, type=int, help='Input Size for FP
 parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation')
-parser.add_argument('--batch_size', default=4, type=int, help='Batch size for training') # o:16
-parser.add_argument('--shuffle', default=True, type=str2bool, help='Shuffle training data')
+parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training') # o:16
+parser.add_argument('--shuffle', default=False, type=str2bool, help='Shuffle training data')
+
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
@@ -95,7 +98,7 @@ parser.add_argument('--freeze_reg_heads', default=False, type=str2bool, help='Fr
 parser.add_argument('--freeze_backbone', default=False, type=str2bool, help='Freeze training of resentFPN')
 parser.add_argument('--pretrained_iter', default=4000, type=int, help='Iteration at which pretraining was stopped') #17000
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
-parser.add_argument('--max_epochs', default=3, type=int, help='Number of epochs to run for')
+parser.add_argument('--max_epochs', default=10, type=int, help='Number of epochs to run for')
 parser.add_argument('--max_iter', default=20001, type=int, help='Number of training iterations') #o:9000
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate') #0.01
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
@@ -109,12 +112,12 @@ parser.add_argument('--fbn','--freeze_bn', default=True, type=str2bool, help='fr
 parser.add_argument('--freezeupto', default=1, type=int, help='layer group number in ResNet up to which needs to be frozen') # 1
 
 # Loss function matching threshold
-parser.add_argument('--positive_threshold', default=0.5, type=float, help='Min Jaccard index for matching')
+parser.add_argument('--positive_threshold', default=0.6, type=float, help='Min Jaccard index for matching')
 parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min Jaccard index for matching')
 
 # Evaluation hyperparameters
-parser.add_argument('--intial_val', default=5000, type=int, help='Initial number of training iterations before evaluation')
-parser.add_argument('--val_step', default=1, type=int, help='Number of training iterations before evaluation')
+parser.add_argument('--intial_val', default=3760, type=int, help='Initial number of training iterations before evaluation')
+parser.add_argument('--val_step', default=3760, type=int, help='Number of training iterations before evaluation')
 parser.add_argument('--iou_thresh', default=0.30, type=float, help='Evaluation threshold') #For evaluation of val set, just check on AP50
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
@@ -181,7 +184,8 @@ def main():
                         
     val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=False, include_phase=args.predict_surgical_phase)
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
-    
+
+    args.train_set_sizes = train_dataset.input_set_sizes
     args.num_classes = len(train_dataset.classes) + 1
     args.classes = train_dataset.classes
     args.use_bias = args.use_bias>0
@@ -268,25 +272,35 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 #    print('Training FPN on ', train_dataset.dataset,'\n')
 
 
-    train_data_loader = data_utils.DataLoader(train_dataset, args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1, num_workers=args.num_workers,
-                                              shuffle=args.shuffle, pin_memory=True, collate_fn=partial(custom_collate, timesteps = args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1 ), drop_last=True)
+    train_data_loader = data_utils.DataLoader(train_dataset, get_data_loader_batch_size(args), num_workers=args.num_workers,
+                                              shuffle=args.shuffle, pin_memory=True, collate_fn=partial(custom_collate, timesteps =get_data_loader_batch_size(
+            args)), drop_last=True)
 
     
-    val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1, num_workers=args.num_workers,
-                                            shuffle=args.shuffle, pin_memory=True, collate_fn=partial(custom_collate, timesteps = args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1 ))
+    val_data_loader = data_utils.DataLoader(val_dataset, get_data_loader_batch_size(args), num_workers=args.num_workers,
+                                            shuffle=args.shuffle, pin_memory=True, collate_fn=partial(custom_collate, timesteps =get_data_loader_batch_size(
+            args)))
   
     torch.cuda.synchronize()
     start = time.perf_counter()
     iteration = args.start_iteration
     epoch = 0
     num_bpe = len(train_data_loader)
+    accumulation_limit_idx = 0
+
     #loss = torch.zeros(1, requires_grad=False, device='cuda:0')
     images_td_batch = torch.tensor([])
     gts_td_batch =torch.tensor([])
     counts_td_batch = torch.tensor([])
     batch_fill_count = 0
-    count_update = 0
+    accumulation_counter = 0
     current_cls_loss = {}
+    grad_accumulate_iterations = args.grad_accumulate_iterations
+    reset_hidden = False
+    if args.enable_variable_grad_accumulation:
+        args.train_set_sizes = [int(math.floor(size/get_data_loader_batch_size(args))) for size in args.train_set_sizes]
+        grad_accumulate_iterations = args.train_set_sizes[accumulation_limit_idx]
+
     while iteration <= args.max_iter or epoch < args.max_epochs:
         epoch +=1
         for i, (images, gts, counts, image_ids, _) in enumerate(train_data_loader):
@@ -307,7 +321,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                 counts = counts_td_batch
             '''
 
-            count_update += 1
+
 
 
             if args.time_distributed_backbone:
@@ -322,14 +336,17 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             counts = counts.cuda(0, non_blocking=True)
             # forward
             torch.cuda.synchronize()
+            accumulation_counter += 1
             data_time.update(time.perf_counter() - start)
+
+
 
             # print(images.size(), anchors.size())
 
             # pdb.set_trace()
             # print(gts.shape, counts.shape, images.shape)
 
-            loss_l, loss_c, loss_p = net(images, gts, counts)
+            loss_l, loss_c, loss_p = net(images, gts, counts, reset_hidden= reset_hidden)
 
             loss_l, loss_c = loss_l.mean(), loss_c.mean()
 
@@ -346,14 +363,21 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             #if(iteration % 200 == 0):
             #    scheduler.reduce_lr()
 
-
-
-            if iteration % args.grad_accumulate_iterations ==0:
+            torch.cuda.synchronize()
+            reset_hidden = False
+            if accumulation_counter % grad_accumulate_iterations ==0:
                 print("Running optimizer step")
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
+
+                torch.cuda.synchronize()
+                accumulation_limit_idx += 1
+                if args.enable_variable_grad_accumulation:
+                    grad_accumulate_iterations = args.train_set_sizes[accumulation_limit_idx % len(args.train_set_sizes)]
+                accumulation_counter = 0
+                reset_hidden = True
                 #loss.detach()
             else:
                 loss.backward()
@@ -461,6 +485,11 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                 log_file.write(prt_str)
 
     log_file.close()
+
+
+def get_data_loader_batch_size(args):
+    return args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1
+
 
 def construct_temporal_batches(images, batch_size, timesteps):
     _, channels, height, width = images.shape

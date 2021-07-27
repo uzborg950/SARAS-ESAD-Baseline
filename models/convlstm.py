@@ -33,13 +33,24 @@ class ConvLSTMCell(nn.Module):
                               out_channels=4 * self.hidden_dim,
                               kernel_size=self.kernel_size,
                               padding=self.padding,
-                              bias=self.bias)
+                              bias=self.bias).cuda()
+        nn.init.normal_(self.conv.weight, mean=0, std=0.01)
+        if hasattr(self.conv.bias, 'data'):
+            nn.init.constant_(self.conv.bias, 0)
 
     def forward(self, input_tensor, cur_state):
         h_cur, c_cur = cur_state
 
+        torch.cuda.synchronize()
+        h_cur = h_cur.to(input_tensor.device)
+        c_cur = c_cur.to(input_tensor.device)
+
+        print("input tensor device", input_tensor.device, "h device: ", h_cur.device)
+
         combined = torch.cat([input_tensor, h_cur], dim=1)  # concatenate along channel axis
 
+        print("combined device", combined.device)
+        torch.cuda.synchronize()
         combined_conv = self.conv(combined)
         cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, self.hidden_dim, dim=1)
         i = torch.sigmoid(cc_i)
@@ -54,8 +65,8 @@ class ConvLSTMCell(nn.Module):
 
     def init_hidden(self, batch_size, image_size):
         height, width = image_size
-        return (torch.zeros(batch_size, self.hidden_dim, height, width, device=self.conv.weight.device),
-                torch.zeros(batch_size, self.hidden_dim, height, width, device=self.conv.weight.device))
+        return (torch.zeros(batch_size, self.hidden_dim, height, width, device=self.conv.weight.device).cuda(),
+                torch.zeros(batch_size, self.hidden_dim, height, width, device=self.conv.weight.device).cuda())
 
 
 class ConvLSTM(nn.Module):
@@ -105,6 +116,7 @@ class ConvLSTM(nn.Module):
         self.batch_first = batch_first
         self.bias = bias
         self.return_all_layers = return_all_layers
+        self.hidden_state = None
 
         cell_list = []
         for i in range(0, self.num_layers):
@@ -117,7 +129,7 @@ class ConvLSTM(nn.Module):
 
         self.cell_list = nn.ModuleList(cell_list)
 
-    def forward(self, input_tensor, hidden_state=None):
+    def forward(self, input_tensor, hidden_state=None, reset_hidden = False):
         """
 
         Parameters
@@ -140,9 +152,9 @@ class ConvLSTM(nn.Module):
         # Implement stateful ConvLSTM
         if hidden_state is not None:
             raise NotImplementedError()
-        else:
+        elif self.hidden_state is None or reset_hidden:
             # Since the init is done in forward. Can send image size here
-            hidden_state = self._init_hidden(batch_size=b,
+            self.hidden_state = self._init_hidden(batch_size=b,
                                              image_size=(h, w))
 
         layer_output_list = []
@@ -153,7 +165,8 @@ class ConvLSTM(nn.Module):
 
         for layer_idx in range(self.num_layers):
 
-            h, c = hidden_state[layer_idx]
+            h, c = self.hidden_state[layer_idx]
+
             output_inner = []
             for t in range(seq_len):
                 h, c = self.cell_list[layer_idx](input_tensor=cur_layer_input[:, t, :, :, :],
