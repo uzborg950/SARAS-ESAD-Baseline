@@ -85,7 +85,7 @@ parser.add_argument('--min_size', default=200, type=int, help='Input Size for FP
 parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation')
-parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training') # o:16
+parser.add_argument('--batch_size', default=4, type=int, help='Batch size for training') # o:16
 parser.add_argument('--shuffle', default=False, type=str2bool, help='Shuffle training data')
 
 # Number of worker to load data in parllel
@@ -103,7 +103,7 @@ parser.add_argument('--max_iter', default=20001, type=int, help='Number of train
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate') #0.01
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--loss_type', default='focal', type=str, help='loss_type')  # o:mbox
-parser.add_argument('--milestones', default='6000,8000,12000,18000', type=str, help='Chnage the lr @')
+parser.add_argument('--milestones', default='3500,6000,9000,12000', type=str, help='Chnage the lr @')#6000,8000,12000,18000
 parser.add_argument('--gammas', default='0.1,0.1,0.1,0.1', type=str, help='Gamma update for SGD')
 parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay for SGD')
 
@@ -175,7 +175,7 @@ def main():
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means, std=args.stds)])
 
-    train_dataset = DetectionDataset(root= args.data_root, train=True, input_sets=['train/set1','train/set2'], transform=train_transform, include_phase=args.predict_surgical_phase)
+    train_dataset = DetectionDataset(root= args.data_root, train=True, input_sets=['train/set1'], transform=train_transform, include_phase=args.predict_surgical_phase)
     print('Done Loading Dataset Train Dataset :::>>>\n',train_dataset.print_str)
     val_transform = transforms.Compose([ 
                         Resize(args.min_size, args.max_size),
@@ -327,7 +327,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             if args.time_distributed_backbone:
                 _, channels, height, width = images.shape
                 images = construct_temporal_batches(images, batch_size, args.temporal_slice_timesteps)
-                gts, counts = generate_temporal_gts(gts, counts, batch_size, args.temporal_slice_timesteps)
+                #gts, counts = generate_temporal_gts(gts, counts, batch_size, args.temporal_slice_timesteps)
 
 #            pdb.set_trace()
             #epoch = int(iteration/num_bpe)
@@ -356,6 +356,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             else:
                 loss = loss_l + loss_c #+ loss
 
+            loss = loss / grad_accumulate_iterations
             #if count_update - args.num_truncated_iterations == 500:
             #    count_update = 0
             #    loss = torch.zeros(1, requires_grad=True, device='cuda:0')
@@ -372,6 +373,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                 scheduler.step()
                 optimizer.zero_grad()
 
+
                 torch.cuda.synchronize()
                 accumulation_limit_idx += 1
                 if args.enable_variable_grad_accumulation:
@@ -381,6 +383,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                 #loss.detach()
             else:
                 loss.backward()
+                scheduler.step()
 
             #loss.backward()
             #optimizer.step()
@@ -488,16 +491,18 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
 
 def get_data_loader_batch_size(args):
-    return args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1
+    #return args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1
+    return args.batch_size if not args.time_distributed_backbone else args.batch_size * args.temporal_slice_timesteps
 
 
 def construct_temporal_batches(images, batch_size, timesteps):
     _, channels, height, width = images.shape
-    images_td = torch.tensor([])
-    for seq_idx in range(batch_size):
-        seq = images[seq_idx:seq_idx + timesteps, :,:,:]
-        images_td = torch.cat((images_td, torch.unsqueeze(seq, 0)), 0)
-    return images_td
+    #images_td = torch.tensor([])
+    #for seq_idx in range(batch_size):
+    #    seq = images[seq_idx:seq_idx + timesteps, :,:,:]
+    #    images_td = torch.cat((images_td, torch.unsqueeze(seq, 0)), 0)
+    #return images_td
+    return images.view(batch_size, timesteps, channels, height, width)
 
 def load_model_state_dict(model_file_name, net):
     net_state_dict = torch.load(model_file_name)
@@ -554,7 +559,7 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, iou_thresh
             if args.time_distributed_backbone:
                 _, channels, height, width = images.shape
                 images = construct_temporal_batches(images, args.batch_size, args.temporal_slice_timesteps)
-                targets, counts = generate_temporal_gts(targets, batch_counts, args.batch_size, args.temporal_slice_timesteps)
+                #targets, counts = generate_temporal_gts(targets, batch_counts, args.batch_size, args.temporal_slice_timesteps)
 
             images = images.cuda(0, non_blocking=True)
 

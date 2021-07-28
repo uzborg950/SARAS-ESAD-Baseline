@@ -31,14 +31,17 @@ class PhaseNet(nn.Module):
         super(PhaseNet, self).__init__()
         self.num_phases = args.num_phases
         self.temporal_cls_backbone = temporal_cls_backbone
-        self.phase_heads = []
         self.feature_layers = args.predictor_layers
+        self.phase_heads = nn.ModuleList(self._make_phase_heads(args, inplanes))
+        self.fc = nn.Linear(len(self.feature_layers) * self.num_phases, self.num_phases)
+
+    def _make_phase_heads(self, args, inplanes):
+        phase_heads = []
         for feature_layer in self.feature_layers:
             dim = img_utils.get_size((args.original_width, args.original_height), args.min_size, args.max_size)
             dim = resnet_utils.get_dimensions(dim, feature_layer)
-            phase_head = PhaseHead(dim,inplanes, self.num_phases, args.temporal_slice_timesteps).cuda()
-            self.phase_heads.append(phase_head)
-        self.fc = nn.Linear(len(self.feature_layers) * self.num_phases, self.num_phases)
+            phase_head = PhaseHead(dim, inplanes, self.num_phases, args.temporal_slice_timesteps).cuda()
+            phase_heads.append(phase_head)
 
     def forward(self, feature_layer_inputs):
         phase_out = []

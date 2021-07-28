@@ -76,12 +76,12 @@ class RetinaNet(nn.Module):
                                             self.num_head_layers - self.shared_heads, self.time_distributed_backbone, init_bg_prob = args.loss_type != 'mbox')  # class subnet. W x H x KA (K=number of action classes)
 
         else:
-            self.reg_temporal = [TemporalNet(self.head_size, self.ar * 4, self.temporal_slice_timesteps, use_bias=self.use_bias, init_bg_prob=False,
+            self.reg_temporal = nn.ModuleList([TemporalNet(self.head_size, self.ar * 4, self.temporal_slice_timesteps, use_bias=self.use_bias, init_bg_prob=False,
                                             temporal_layers=self.temporal_net_layers,
-                                            convlstm_layers=self.convlstm_layers) for _ in args.predictor_layers]
-            self.cls_temporal = [TemporalNet(self.head_size, self.ar * self.num_classes, self.temporal_slice_timesteps, use_bias=self.use_bias,
+                                            convlstm_layers=self.convlstm_layers) for _ in args.predictor_layers])
+            self.cls_temporal = nn.ModuleList([TemporalNet(self.head_size, self.ar * self.num_classes, self.temporal_slice_timesteps, use_bias=self.use_bias,
                                             init_bg_prob=True, temporal_layers=self.temporal_net_layers,
-                                            convlstm_layers=self.convlstm_layers) for _ in args.predictor_layers]
+                                            convlstm_layers=self.convlstm_layers) for _ in args.predictor_layers])
             if self.include_phase: #TODO ADAPT FOR MULTIPLE TEMPORAL NETS
                 self.phase_temporal = PhaseNet(self.cls_temporal, self.ar * self.num_classes, args)
 
