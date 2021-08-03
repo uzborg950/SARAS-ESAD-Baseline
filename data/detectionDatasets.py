@@ -188,6 +188,12 @@ class DetectionDataset(data.Dataset):
         return img, targets, index, wh
 
 
+def get_non_empty_sample(batch):
+    for sample in batch:
+        if not torch.equal(sample[0], torch.tensor(-1, dtype=torch.float32)):
+            return sample[0], torch.FloatTensor(sample[1]), sample[2], sample[3]
+
+
 def custom_collate(batch, timesteps):  # batch size 16
     targets = []
     images = []
@@ -198,6 +204,13 @@ def custom_collate(batch, timesteps):  # batch size 16
 
     for sample in batch:
         if torch.equal(sample[0], torch.tensor(-1, dtype=torch.float32)):
+            if not images: #Hack for if the first image is -1 (this can only come up when shuffle true)
+                image, target, id, whsi = get_non_empty_sample(batch)
+                images.append(image.clone())
+                targets.append(target.clone())
+                image_ids.append(id)
+                whs.append(whsi)
+                continue
             images.append(images[-1].clone())
             targets.append(targets[-1].clone())
             image_ids.append(image_ids[-1])

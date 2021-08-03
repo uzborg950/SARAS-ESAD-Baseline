@@ -64,7 +64,8 @@ parser.add_argument('--num_phases', default=4, type=int, help='Total number of p
 parser.add_argument('--time_distributed_backbone', default=True, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
 parser.add_argument('--temporal_slice_timesteps', default=4, type=int, help='Number of timesteps/frame comprising a temporal slice')
 # Use ConvLSTM
-parser.add_argument('--append_temporal_net', default=True, type=str2bool, help='Append temporal model after FPN, before predictor conv head')
+parser.add_argument('--append_cls_temporal_net', default=True, type=str2bool, help='Append cls temporal model after FPN, before cls predictor conv head')
+parser.add_argument('--append_reg_temporal_net', default=False, type=str2bool, help='Append regression temporal model after FPN, before regression predictor conv head')
 parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
 parser.add_argument('--truncate_bptt', default=False, type=str2bool, help='Truncate iterations during BPTT to down-scale computation graph')
@@ -86,7 +87,7 @@ parser.add_argument('--min_size', default=200, type=int, help='Input Size for FP
 parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation')
-parser.add_argument('--batch_size', default=4, type=int, help='Batch size for training') # o:16
+parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training') # o:16
 parser.add_argument('--shuffle', default=True, type=str2bool, help='Shuffle training data')
 
 # Number of worker to load data in parllel
@@ -117,8 +118,8 @@ parser.add_argument('--positive_threshold', default=0.6, type=float, help='Min J
 parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min Jaccard index for matching')
 
 # Evaluation hyperparameters
-parser.add_argument('--intial_val', default=5000, type=int, help='Initial number of training iterations before evaluation')
-parser.add_argument('--val_step', default=5000, type=int, help='Number of training iterations before evaluation')
+parser.add_argument('--intial_val', default=2350, type=int, help='Initial number of training iterations before evaluation')
+parser.add_argument('--val_step', default=2350, type=int, help='Number of training iterations before evaluation') #b=16, 1ep= 1175it , total= 18800 .   b=8, 1ep=2350 it, total= 18800
 parser.add_argument('--iou_thresh', default=0.30, type=float, help='Evaluation threshold') #For evaluation of val set, just check on AP50
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')

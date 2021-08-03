@@ -27,8 +27,8 @@ class WarmupMultiStepLR(torch.optim.lr_scheduler._LRScheduler):
 
     
     def print_lr(self, is_verbose, group, lr, epoch=None): #The extra arguments have been added to deal with the new inheritted method in lr_scheduler
-        #pass
-        print([[group['name'], group['lr']] for group in self.optimizer.param_groups])
+        pass
+        #print([[group['name'], group['lr']] for group in self.optimizer.param_groups])
 
 def get_optim(args, net):
     freeze_layers = ['backbone_net.layer'+str(n) for n in range(1, args.freezeupto+1)]

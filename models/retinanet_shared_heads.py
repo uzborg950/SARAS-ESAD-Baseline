@@ -55,7 +55,8 @@ class RetinaNet(nn.Module):
         self.backbone_net = backbone
         self.shared_heads = args.shared_heads
         self.num_head_layers = args.num_head_layers
-        self.append_temporal_net = args.append_temporal_net
+        self.append_reg_temporal_net = args.append_reg_temporal_net
+        self.append_cls_temporal_net = args.append_cls_temporal_net
         self.convlstm_layers = args.convlstm_layers
         self.temporal_net_layers = args.temporal_net_layers
         self.include_phase = args.predict_surgical_phase
@@ -69,23 +70,26 @@ class RetinaNet(nn.Module):
         if self.shared_heads > 0:
             self.features_layers = self.make_features(self.shared_heads)
 
-        if not self.append_temporal_net:
+        if not self.append_reg_temporal_net:
             self.reg_heads = self.make_head(self.ar * 4,
                                             self.num_head_layers - self.shared_heads, self.time_distributed_backbone, init_bg_prob= False)  # box subnet. Figure 3 retinanet paper: W x H x 4A (A=num of anchors)
+        else:
+            self.reg_temporal = nn.ModuleList([TemporalNet(self.head_size, self.ar * 4, self.temporal_slice_timesteps,
+                                                           use_bias=self.use_bias, init_bg_prob=False,
+                                                           temporal_layers=self.temporal_net_layers,
+                                                           convlstm_layers=self.convlstm_layers) for _ in
+                                               args.predictor_layers])
+        if not self.append_cls_temporal_net:
             self.cls_heads = self.make_head(self.ar * self.num_classes,
                                             self.num_head_layers - self.shared_heads, self.time_distributed_backbone, init_bg_prob = args.loss_type != 'mbox')  # class subnet. W x H x KA (K=number of action classes)
-
         else:
-            self.reg_temporal = nn.ModuleList([TemporalNet(self.head_size, self.ar * 4, self.temporal_slice_timesteps, use_bias=self.use_bias, init_bg_prob=False,
-                                            temporal_layers=self.temporal_net_layers,
-                                            convlstm_layers=self.convlstm_layers) for _ in args.predictor_layers])
             self.cls_temporal = nn.ModuleList([TemporalNet(self.head_size, self.ar * self.num_classes, self.temporal_slice_timesteps, use_bias=self.use_bias,
                                             init_bg_prob=True, temporal_layers=self.temporal_net_layers,
                                             convlstm_layers=self.convlstm_layers) for _ in args.predictor_layers])
             if self.include_phase: #TODO ADAPT FOR MULTIPLE TEMPORAL NETS
                 self.phase_temporal = PhaseNet(self.cls_temporal, self.ar * self.num_classes, args)
 
-        #if args.loss_type != 'mbox' and not self.append_temporal_net:
+        #if args.loss_type != 'mbox':
         #    self.prior_prob = 0.01
         #    bias_value = -math.log(
         #        (1 - self.prior_prob) / self.prior_prob)  # focal mentions this initialization in the paper (page 5)
@@ -119,15 +123,21 @@ class RetinaNet(nn.Module):
         phases = list()
 
         for idx, x in enumerate(features):
-            if not self.append_temporal_net:
+            if not self.append_reg_temporal_net:
                 if self.time_distributed_backbone:
                     reg_out = self.collate_timesteps(self.reg_heads(x))
-                    cls_out = self.collate_timesteps(self.cls_heads(x))
                 else:
                     reg_out = self.reg_heads(x)  # 2,25,45,36 (same as P3 w,h)
+            else:
+                reg_out = self.get_temporal_output(self.reg_temporal[idx], x, reset_hidden)
+
+
+            if not self.append_cls_temporal_net:
+                if self.time_distributed_backbone:
+                    cls_out = self.collate_timesteps(self.cls_heads(x))
+                else:
                     cls_out = self.cls_heads(x)
             else:
-                reg_out = self.get_temporal_output(self.reg_temporal[idx] , x, reset_hidden)
                 cls_out = self.get_temporal_output(self.cls_temporal[idx], x, reset_hidden)
 
 
@@ -145,7 +155,7 @@ class RetinaNet(nn.Module):
         flat_conf = conf.view(conf.size(0), -1, self.num_classes)  # batch size ,x,22 -> For each pixel of the image and for all anchors at all grid sizes, give confidence of action
 
         out_phase = None
-        if self.append_temporal_net and self.include_phase:
+        if self.append_cls_temporal_net and self.include_phase:
             out_phase = self.phase_temporal(features)
         # pdb.set_trace()
 

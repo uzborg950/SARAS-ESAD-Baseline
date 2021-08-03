@@ -52,7 +52,8 @@ parser.add_argument('--num_phases', default=4, type=int, help='Total number of p
 parser.add_argument('--time_distributed_backbone', default=False, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
 parser.add_argument('--temporal_slice_timesteps', default=4, type=int, help='Number of timesteps/frame comprising a temporal slice')
 # Use LSTM
-parser.add_argument('--append_temporal_net', default=False, type=str2bool, help='Append temporal model after FPN, before predictor conv head')
+parser.add_argument('--append_cls_temporal_net', default=False, type=str2bool, help='Append cls temporal model after FPN, before cls predictor conv head')
+parser.add_argument('--append_reg_temporal_net', default=False, type=str2bool, help='Append regression temporal model after FPN, before regression predictor conv head')
 parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
 parser.add_argument('--num_truncated_iterations', default=1, type=int, help='Truncate iterations during BPTT to down-scale computation graph')
