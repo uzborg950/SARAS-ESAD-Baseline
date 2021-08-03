@@ -44,7 +44,7 @@ parser.add_argument('--generate_frames', default=True,type=str2bool, help='Gener
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
 parser.add_argument('--basenet', default='resnet18', help='pretrained base model')
 #Binary classification loss
-parser.add_argument('--bin_loss', default=False, type=str2bool,help='Include binary classification loss (object/background')
+parser.add_argument('--bin_loss', default=True, type=str2bool,help='Include binary classification loss (object/background')
 # Multi-Task Surgical Phase Detection
 parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, help='predict surgical phase as well')
 parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')
@@ -68,18 +68,18 @@ parser.add_argument('--dataset', default='esad', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment
 parser.add_argument('--original_width', default=1920, type=int, help='Actual width of input')
 parser.add_argument('--original_height', default=1080, type=int, help='Actual height of input')
-parser.add_argument('--min_size', default=200, type=int, help='Input Size for FPN')
+parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
 parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation')
-parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training')
+parser.add_argument('--batch_size', default=4, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=8, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--loss_type', default='focal', type=str, help='loss_type')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
-parser.add_argument('--eval_iters', default='9000', type=str, help='Chnage the lr @')#5000,6000,7000,9000
+parser.add_argument('--eval_iters', default='14000', type=str, help='Chnage the lr @')#5000,6000,7000,9000
 
 # Freeze batch normlisatio layer or not 
 parser.add_argument('--fbn', default=True, type=bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
@@ -87,9 +87,9 @@ parser.add_argument('--freezeupto', default=1, type=int, help='if 0 freeze or el
 
 # Evaluation hyperparameters
 parser.add_argument('--iou_threshs', default='0.1,0.3,0.5', type=str, help='Evaluation thresholds')
-parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
-parser.add_argument('--nms_thresh', default=0.5, type=float, help='NMS threshold')
-parser.add_argument('--topk', default=25, type=int, help='topk for evaluation')
+parser.add_argument('--conf_thresh', default=0.2, type=float, help='Confidence threshold for evaluation') #0.05
+parser.add_argument('--nms_thresh', default=0.5, type=float, help='NMS threshold') #0.5
+parser.add_argument('--topk', default=1, type=int, help='topk for evaluation') #25
 
 # Progress logging
 parser.add_argument('--log_iters', default=True, type=str2bool, help='Print the loss at each iteration')
@@ -106,9 +106,9 @@ parser.add_argument('--save_root', default='..\\checkpoint\\', help='Location to
 parser.add_argument('--model_dir', default='../pretrain/resnet/', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
 
 #Set params for loading model (Params that aren't used in actual testing but are used while loading particular model from filesystem)
-parser.add_argument('--positive_threshold', default=0.5, type=float, help='Min Jaccard index for matching')
+parser.add_argument('--positive_threshold', default=0.6, type=float, help='Min Jaccard index for matching')
 parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min Jaccard index for matching')
-parser.add_argument('--shuffle', default=True, type=str2bool, help='Shuffle training data')
+parser.add_argument('--shuffle', default=False, type=str2bool, help='Shuffle training data')
 
 ## Parse arguments
 args = parser.parse_args()

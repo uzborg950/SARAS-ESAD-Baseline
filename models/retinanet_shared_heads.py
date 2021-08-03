@@ -100,7 +100,7 @@ class RetinaNet(nn.Module):
             else:
                 error('Define correct loss type')
 
-    def forward(self, images, gts=None, counts=None, get_features=False, reset_hidden=False):
+    def forward(self, images, gts=None, counts=None, get_features=False, reset_hidden=True):
         sources = self.backbone_net(images)
         features = list()
         # pdb.set_trace()

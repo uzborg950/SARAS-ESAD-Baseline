@@ -19,7 +19,7 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 from PIL import Image, ImageDraw
 import glob
 import pdb
-
+import math
 def read_file(path, full_test, include_phase):
     try:
         with open(path, 'r') as f:
@@ -27,7 +27,7 @@ def read_file(path, full_test, include_phase):
     except:
         lines = None
 
-    if lines is None and full_test:
+    if not lines and full_test:
         # in case we are testing and we don't have labels
         # but we need to return at least one label per image
         # we fake it like belwo
@@ -55,12 +55,16 @@ def read_file(path, full_test, include_phase):
     
     return out_data
 
-def read_labels(image_files, full_test, include_phase):
+def read_labels(image_files, full_test, include_phase, batch):
     labels=[]
     input_set_sizes = []
     count = 0
     for img_path in image_files:
         if img_path == -1:
+            if batch is not None: #put dummy data to fill out remaining batch
+                for _ in range(batch - int(math.modf(count/batch)[0] * batch)):
+                    labels.append(-1)
+                count = count + batch - int(math.modf(count/batch)[0] * batch)
             input_set_sizes.append(count)
             count = 0
             continue
@@ -74,7 +78,7 @@ def read_labels(image_files, full_test, include_phase):
 
 def frame_number_sorter(item):
     return int(item.split("_")[-1].split(".")[0])
-def read_sets(path, input_sets=['train/set1','train/set2'], full_test=False, include_phase=False):
+def read_sets(path, input_sets=['train/set1','train/set2'], full_test=False, include_phase=False, batch=None):
     
     all_files=[]
     for set_name in input_sets:
@@ -83,13 +87,13 @@ def read_sets(path, input_sets=['train/set1','train/set2'], full_test=False, inc
         all_files.extend(image_files)
         all_files.append(-1)
         
-    labels, input_set_sizes = read_labels(all_files, full_test, include_phase=include_phase)
+    labels, input_set_sizes = read_labels(all_files, full_test, include_phase=include_phase, batch=batch)
 
     print('length of labels', len(labels))
     return(labels, input_set_sizes)
     
             
-def make_object_lists(rootpath, input_sets=['train/set1','train/set2'], full_test=False, include_phase= False):
+def make_object_lists(rootpath, input_sets=['train/set1','train/set2'], full_test=False, include_phase= False, batch= None):
     '''
 
     input_sets has be a list of set needs tobe read : 
@@ -103,7 +107,7 @@ def make_object_lists(rootpath, input_sets=['train/set1','train/set2'], full_tes
 
     cls_list = [name for name in cls_list if len(name)>0]
     
-    final_labels, input_set_sizes = read_sets(rootpath, input_sets, full_test, include_phase=include_phase)
+    final_labels, input_set_sizes = read_sets(rootpath, input_sets, full_test, include_phase=include_phase, batch= batch)
         
     return(cls_list, final_labels, input_set_sizes)
 
@@ -116,7 +120,7 @@ def resize(image, size):
 class DetectionDataset(data.Dataset):
     """Detection Dataset class for pytorch dataloader"""
 
-    def __init__(self, root, train=False, input_sets=['train/set1','train/set2'], transform=None, anno_transform=None, full_test=False, include_phase=False, args=None):
+    def __init__(self, root, train=False, input_sets=['train/set1','train/set2'], transform=None, anno_transform=None, full_test=False, include_phase=False, batch=None):
         self.include_phase = include_phase
         self.train = train
         self.root= root
@@ -124,7 +128,7 @@ class DetectionDataset(data.Dataset):
         self.transform = transform
         self.anno_transform = anno_transform
         self.ids = list()
-        self.classes, self.ids, self.input_set_sizes = make_object_lists(self.root, input_sets=input_sets, full_test=full_test, include_phase=self.include_phase)
+        self.classes, self.ids, self.input_set_sizes = make_object_lists(self.root, input_sets=input_sets, full_test=full_test, include_phase=self.include_phase, batch=batch)
         self.print_str= ''
         self.max_targets = 20
         
@@ -134,7 +138,10 @@ class DetectionDataset(data.Dataset):
 
     def __getitem__(self, index):
         annot_info = self.ids[index]
-        
+
+        if annot_info == -1: #Dummy batch-filler data
+            return torch.tensor(-1, dtype=torch.float32), -1, -1, -1
+
         img_path = annot_info[0]
         bbox_info = np.array(annot_info[1]) #shape: (G, 5) , G is the number of actions in frame. 5 is box coords (4) + action class(1)
         phase = -1
@@ -190,6 +197,12 @@ def custom_collate(batch, timesteps):  # batch size 16
     # rgb_images, flow_images, aug_bxsl, prior_labels, prior_gt_locations, num_mt, index
 
     for sample in batch:
+        if torch.equal(sample[0], torch.tensor(-1, dtype=torch.float32)):
+            images.append(images[-1].clone())
+            targets.append(targets[-1].clone())
+            image_ids.append(image_ids[-1])
+            whs.append(whs[-1])
+            continue
         images.append(sample[0])
         targets.append(torch.FloatTensor(sample[1]))
         image_ids.append(sample[2]) #Index while iterating total list of samples (randomized iteration)

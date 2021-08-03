@@ -50,7 +50,7 @@ def set_args(args, iftest='train'):
     return args
 
 def create_exp_name(args):
-    return 'FPN-binloss{:d}-nve{:02d}-pve{:02d}-timedistr{:d}-timesteps{:d}-temporal{:d}-convlstm{:d}-templayers{:d}-shuffle{:d}-phase{:d}-{:d}x{:d}-{:01d}-{:s}-{:s}-hl{:01d}s{:01d}-bn{:d}f{:d}b{:d}-bs{:02d}-{:s}-lr{:06d}-{:s}'.format(
+    return 'FPN-binloss{:d}-nve{:02d}-pve{:02d}-td{:d}-steps{:d}-temp{:d}-convlstm{:d}-tl{:d}-sfl{:d}-ph{:d}-{:d}x{:d}-{:01d}-{:s}-{:s}-hl{:01d}s{:01d}-bn{:d}f{:d}b{:d}-bs{:02d}-{:s}-lr{:06d}-{:s}'.format(
                                             int(args.bin_loss), int(args.negative_threshold * 10), int(args.positive_threshold * 10),
                                             int(args.time_distributed_backbone), args.temporal_slice_timesteps, int(args.append_temporal_net),
                                             args.convlstm_layers, args.temporal_net_layers, int(args.shuffle), int(args.predict_surgical_phase),

@@ -67,9 +67,10 @@ parser.add_argument('--temporal_slice_timesteps', default=4, type=int, help='Num
 parser.add_argument('--append_temporal_net', default=True, type=str2bool, help='Append temporal model after FPN, before predictor conv head')
 parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
-parser.add_argument('--num_truncated_iterations', default=100, type=int, help='Truncate iterations during BPTT to down-scale computation graph')
-parser.add_argument('--grad_accumulate_iterations', default=1, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations')
-parser.add_argument('--enable_variable_grad_accumulation', default=True, type=str2bool, help='Configure gradient accumulation across full train sets of variable sizes')
+parser.add_argument('--truncate_bptt', default=False, type=str2bool, help='Truncate iterations during BPTT to down-scale computation graph')
+parser.add_argument('--grad_accumulate_iterations', default=1, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations') #100
+parser.add_argument('--enable_variable_grad_accumulation', default=False, type=str2bool, help='Configure gradient accumulation across full train sets of variable sizes')
+parser.add_argument('--reset_hidden_every_step', default=True, type=str2bool, help='Reset hidden state at every optimizer step')
 #parser.add_argument('--lstm_depth', default=198, type=int, help='Append lstm layer after FCN layers of retinaNet')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
 parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
@@ -86,7 +87,7 @@ parser.add_argument('--max_size', default=1080, type=int, help='Input Size for F
 #  data loading argumnets
 parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation')
 parser.add_argument('--batch_size', default=4, type=int, help='Batch size for training') # o:16
-parser.add_argument('--shuffle', default=False, type=str2bool, help='Shuffle training data')
+parser.add_argument('--shuffle', default=True, type=str2bool, help='Shuffle training data')
 
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of workers used in dataloading')
@@ -96,14 +97,14 @@ parser.add_argument('--load_non_strict_pretrained', default=False, type=str2bool
 parser.add_argument('--freeze_cls_heads', default=False, type=str2bool, help='Freeze training of classification heads (excluding LSTM)')
 parser.add_argument('--freeze_reg_heads', default=False, type=str2bool, help='Freeze training of box regression heads (excluding LSTM)')
 parser.add_argument('--freeze_backbone', default=False, type=str2bool, help='Freeze training of resentFPN')
-parser.add_argument('--pretrained_iter', default=4000, type=int, help='Iteration at which pretraining was stopped') #17000
+parser.add_argument('--pretrained_iter', default=14000, type=int, help='Iteration at which pretraining was stopped') #17000
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
-parser.add_argument('--max_epochs', default=10, type=int, help='Number of epochs to run for')
-parser.add_argument('--max_iter', default=20001, type=int, help='Number of training iterations') #o:9000
+parser.add_argument('--max_epochs', default=40, type=int, help='Number of epochs to run for')
+parser.add_argument('--max_iter', default=50000, type=int, help='Number of training iterations') #o:9000
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate') #0.01
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--loss_type', default='focal', type=str, help='loss_type')  # o:mbox
-parser.add_argument('--milestones', default='3500,6000,9000,12000', type=str, help='Chnage the lr @')#6000,8000,12000,18000
+parser.add_argument('--milestones', default='11000,22000,33000,44000', type=str, help='Chnage the lr @')#6000,8000,12000,18000 ; train set 1 only 3500,6000,9000,12000 ;
 parser.add_argument('--gammas', default='0.1,0.1,0.1,0.1', type=str, help='Gamma update for SGD')
 parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay for SGD')
 
@@ -116,8 +117,8 @@ parser.add_argument('--positive_threshold', default=0.6, type=float, help='Min J
 parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min Jaccard index for matching')
 
 # Evaluation hyperparameters
-parser.add_argument('--intial_val', default=3760, type=int, help='Initial number of training iterations before evaluation')
-parser.add_argument('--val_step', default=3760, type=int, help='Number of training iterations before evaluation')
+parser.add_argument('--intial_val', default=5000, type=int, help='Initial number of training iterations before evaluation')
+parser.add_argument('--val_step', default=5000, type=int, help='Number of training iterations before evaluation')
 parser.add_argument('--iou_thresh', default=0.30, type=float, help='Evaluation threshold') #For evaluation of val set, just check on AP50
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
@@ -175,7 +176,8 @@ def main():
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means, std=args.stds)])
 
-    train_dataset = DetectionDataset(root= args.data_root, train=True, input_sets=['train/set1'], transform=train_transform, include_phase=args.predict_surgical_phase)
+    train_dataset = DetectionDataset(root= args.data_root, train=True, input_sets=['train/set1','train/set2'], transform=train_transform, include_phase=args.predict_surgical_phase, batch=get_data_loader_batch_size(
+            args))
     print('Done Loading Dataset Train Dataset :::>>>\n',train_dataset.print_str)
     val_transform = transforms.Compose([ 
                         Resize(args.min_size, args.max_size),
@@ -286,20 +288,21 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     iteration = args.start_iteration
     epoch = 0
     num_bpe = len(train_data_loader)
-    accumulation_limit_idx = 0
+    train_set_idx = 0
 
-    #loss = torch.zeros(1, requires_grad=False, device='cuda:0')
+    loss = torch.zeros(1, requires_grad=True).cuda()
     images_td_batch = torch.tensor([])
     gts_td_batch =torch.tensor([])
     counts_td_batch = torch.tensor([])
     batch_fill_count = 0
     accumulation_counter = 0
     current_cls_loss = {}
+    step_counter = 1
     grad_accumulate_iterations = args.grad_accumulate_iterations
     reset_hidden = False
     if args.enable_variable_grad_accumulation:
         args.train_set_sizes = [int(math.floor(size/get_data_loader_batch_size(args))) for size in args.train_set_sizes]
-        grad_accumulate_iterations = args.train_set_sizes[accumulation_limit_idx]
+        grad_accumulate_iterations = args.train_set_sizes[train_set_idx]
 
     while iteration <= args.max_iter or epoch < args.max_epochs:
         epoch +=1
@@ -352,11 +355,11 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
             if args.predict_surgical_phase:
                 loss_p = loss_p.mean()
-                loss = loss_l + loss_c + loss_p  # + loss
+                loss_t = loss_l + loss_c + loss_p  # + loss
             else:
-                loss = loss_l + loss_c #+ loss
+                loss_t = loss_l + loss_c #+ loss
 
-            loss = loss / grad_accumulate_iterations
+            loss = loss + loss_t / grad_accumulate_iterations
             #if count_update - args.num_truncated_iterations == 500:
             #    count_update = 0
             #    loss = torch.zeros(1, requires_grad=True, device='cuda:0')
@@ -373,16 +376,30 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                 scheduler.step()
                 optimizer.zero_grad()
 
-
+                loss = torch.zeros(1, requires_grad=True).cuda()
                 torch.cuda.synchronize()
-                accumulation_limit_idx += 1
+
+                step_counter+=1
                 if args.enable_variable_grad_accumulation:
-                    grad_accumulate_iterations = args.train_set_sizes[accumulation_limit_idx % len(args.train_set_sizes)]
+                    train_set_idx += 1
+                    grad_accumulate_iterations = args.train_set_sizes[train_set_idx % len(args.train_set_sizes)]
+                    reset_hidden = True
+
+                elif step_counter * get_data_loader_batch_size(args) * grad_accumulate_iterations > args.train_set_sizes[train_set_idx % len(args.train_set_sizes)]:
+                    train_set_idx += 1
+                    step_counter = 0
+                    reset_hidden = True
+
+                elif args.reset_hidden_every_step:
+                    reset_hidden = True
+
                 accumulation_counter = 0
-                reset_hidden = True
+
                 #loss.detach()
             else:
-                loss.backward()
+                if not args.truncate_bptt:
+                    loss.backward()
+                    loss = torch.zeros(1, requires_grad=True).cuda()
                 scheduler.step()
 
             #loss.backward()
@@ -490,6 +507,14 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     log_file.close()
 
 
+#def get_normalizer(args, grad_accumulate_iterations, batch):
+#    if args.enable_variable_grad_accumulation:
+#        return grad_accumulate_iterations
+#    else:
+#        return grad_accumulate_iterations * batch
+
+
+
 def get_data_loader_batch_size(args):
     #return args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1
     return args.batch_size if not args.time_distributed_backbone else args.batch_size * args.temporal_slice_timesteps
@@ -507,6 +532,11 @@ def construct_temporal_batches(images, batch_size, timesteps):
 def load_model_state_dict(model_file_name, net):
     net_state_dict = torch.load(model_file_name)
     #net_state_dict = {k.replace("module.",""): net_state_dict[k] for k in net_state_dict}
+    #for k in list(net_state_dict.keys()): #Renames backbone_net keys to backbone_net.td_net for time distributed network
+    #    if "backbone_net" in k:
+    #        net_state_dict[k.replace("backbone_net.","backbone_net.td_net.")] = net_state_dict[k]
+    #        del net_state_dict[k]
+    #torch.save(net_state_dict, '{:s}/model_{:06d}.pth'.format(args.save_root, 14000))
     net.load_state_dict(net_state_dict, strict=True)
 
 
