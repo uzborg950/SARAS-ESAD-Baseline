@@ -67,11 +67,12 @@ parser.add_argument('--temporal_slice_timesteps', default=4, type=int, help='Num
 parser.add_argument('--append_cls_temporal_net', default=True, type=str2bool, help='Append cls temporal model after FPN, before cls predictor conv head')
 parser.add_argument('--append_reg_temporal_net', default=False, type=str2bool, help='Append regression temporal model after FPN, before regression predictor conv head')
 parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
-parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
-parser.add_argument('--truncate_bptt', default=False, type=str2bool, help='Truncate iterations during BPTT to down-scale computation graph')
+parser.add_argument('--temporal_net_layers', default=3, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
+parser.add_argument('--truncate_bptt', default=True, type=str2bool, help='Truncate iterations during BPTT to down-scale computation graph')
+parser.add_argument('--truncate_bptt_length', default=4, type=int, help='Perform BPTT for the given length (k1)')
 parser.add_argument('--grad_accumulate_iterations', default=1, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations') #100
-parser.add_argument('--enable_variable_grad_accumulation', default=False, type=str2bool, help='Configure gradient accumulation across full train sets of variable sizes')
-parser.add_argument('--reset_hidden_every_step', default=True, type=str2bool, help='Reset hidden state at every optimizer step')
+parser.add_argument('--enable_variable_grad_accumulation', default=True, type=str2bool, help='Configure gradient accumulation across full train sets of variable sizes')
+parser.add_argument('--reset_hidden_every_step', default=False, type=str2bool, help='Reset hidden state at every optimizer step')
 #parser.add_argument('--lstm_depth', default=198, type=int, help='Append lstm layer after FCN layers of retinaNet')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
 parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
@@ -88,7 +89,7 @@ parser.add_argument('--max_size', default=1080, type=int, help='Input Size for F
 #  data loading argumnets
 parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation')
 parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training') # o:16
-parser.add_argument('--shuffle', default=True, type=str2bool, help='Shuffle training data')
+parser.add_argument('--shuffle', default=False, type=str2bool, help='Shuffle training data')
 
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of workers used in dataloading')
@@ -300,6 +301,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     current_cls_loss = {}
     step_counter = 1
     grad_accumulate_iterations = args.grad_accumulate_iterations
+    truncate_bptt_length = args.truncate_bptt_length
     reset_hidden = False
     if args.enable_variable_grad_accumulation:
         args.train_set_sizes = [int(math.floor(size/get_data_loader_batch_size(args))) for size in args.train_set_sizes]
@@ -398,7 +400,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
                 #loss.detach()
             else:
-                if not args.truncate_bptt:
+                if not args.truncate_bptt or (args.truncate_bptt and accumulation_counter % truncate_bptt_length ==0):
                     loss.backward()
                     loss = torch.zeros(1, requires_grad=True).cuda()
                 scheduler.step()
