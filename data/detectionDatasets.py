@@ -62,9 +62,9 @@ def read_labels(image_files, full_test, include_phase, batch):
     for img_path in image_files:
         if img_path == -1:
             if batch is not None: #put dummy data to fill out remaining batch
-                for _ in range(batch - int(math.modf(count/batch)[0] * batch)):
+                for _ in range(batch - int(math.ceil(math.modf(count/batch)[0] * batch))):
                     labels.append(-1)
-                count = count + batch - int(math.modf(count/batch)[0] * batch)
+                    count+=1
             input_set_sizes.append(count)
             count = 0
             continue
