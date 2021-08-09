@@ -62,12 +62,12 @@ parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, he
 parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')
 # Use Time Distribution for CNN backbone
 parser.add_argument('--time_distributed_backbone', default=True, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
-parser.add_argument('--temporal_slice_timesteps', default=4, type=int, help='Number of timesteps/frame comprising a temporal slice')
+parser.add_argument('--temporal_slice_timesteps', default=2, type=int, help='Number of timesteps/frame comprising a temporal slice')
 # Use ConvLSTM
 parser.add_argument('--append_cls_temporal_net', default=True, type=str2bool, help='Append cls temporal model after FPN, before cls predictor conv head')
-parser.add_argument('--append_reg_temporal_net', default=False, type=str2bool, help='Append regression temporal model after FPN, before regression predictor conv head')
+parser.add_argument('--append_reg_temporal_net', default=True, type=str2bool, help='Append regression temporal model after FPN, before regression predictor conv head')
 parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
-parser.add_argument('--temporal_net_layers', default=3, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
+parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
 parser.add_argument('--truncate_bptt', default=True, type=str2bool, help='Truncate iterations during BPTT to down-scale computation graph')
 parser.add_argument('--truncate_bptt_length', default=4, type=int, help='Perform BPTT for the given length (k1)')
 parser.add_argument('--grad_accumulate_iterations', default=1, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations') #100
@@ -84,11 +84,11 @@ parser.add_argument('--dataset', default='esad', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment
 parser.add_argument('--original_width', default=1920, type=int, help='Actual width of input')
 parser.add_argument('--original_height', default=1080, type=int, help='Actual height of input')
-parser.add_argument('--min_size', default=200, type=int, help='Input Size for FPN') #o: 600
+parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN') #o: 600
 parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation')
-parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training') # o:16
+parser.add_argument('--batch_size', default=4, type=int, help='Batch size for training') # o:16
 parser.add_argument('--shuffle', default=False, type=str2bool, help='Shuffle training data')
 
 # Number of worker to load data in parllel
@@ -99,7 +99,7 @@ parser.add_argument('--load_non_strict_pretrained', default=False, type=str2bool
 parser.add_argument('--freeze_cls_heads', default=False, type=str2bool, help='Freeze training of classification heads (excluding LSTM)')
 parser.add_argument('--freeze_reg_heads', default=False, type=str2bool, help='Freeze training of box regression heads (excluding LSTM)')
 parser.add_argument('--freeze_backbone', default=False, type=str2bool, help='Freeze training of resentFPN')
-parser.add_argument('--pretrained_iter', default=14000, type=int, help='Iteration at which pretraining was stopped') #17000
+parser.add_argument('--pretrained_iter', default=8225, type=int, help='Iteration at which pretraining was stopped') #17000
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
 parser.add_argument('--max_epochs', default=40, type=int, help='Number of epochs to run for')
 parser.add_argument('--max_iter', default=50000, type=int, help='Number of training iterations') #o:9000
@@ -119,8 +119,8 @@ parser.add_argument('--positive_threshold', default=0.6, type=float, help='Min J
 parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min Jaccard index for matching')
 
 # Evaluation hyperparameters
-parser.add_argument('--intial_val', default=2350, type=int, help='Initial number of training iterations before evaluation')
-parser.add_argument('--val_step', default=2350, type=int, help='Number of training iterations before evaluation') #b=16, 1ep= 1175it , total= 18800 .   b=8, 1ep=2350 it, total= 18800
+parser.add_argument('--intial_val', default=4699, type=int, help='Initial number of training iterations before evaluation')
+parser.add_argument('--val_step', default=4699, type=int, help='Number of training iterations before evaluation') #b=16, 1ep= 1175it , total= 18800 .   b=8, 1ep=2350 it, total= 18800. b=4, 1ep=4699 total=18796
 parser.add_argument('--iou_thresh', default=0.30, type=float, help='Evaluation threshold') #For evaluation of val set, just check on AP50
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
@@ -508,14 +508,6 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                 log_file.write(prt_str)
 
     log_file.close()
-
-
-#def get_normalizer(args, grad_accumulate_iterations, batch):
-#    if args.enable_variable_grad_accumulation:
-#        return grad_accumulate_iterations
-#    else:
-#        return grad_accumulate_iterations * batch
-
 
 
 def get_data_loader_batch_size(args):
