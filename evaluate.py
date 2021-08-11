@@ -56,8 +56,11 @@ parser.add_argument('--append_cls_temporal_net', default=False, type=str2bool, h
 parser.add_argument('--append_reg_temporal_net', default=False, type=str2bool, help='Append regression temporal model after FPN, before regression predictor conv head')
 parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
-parser.add_argument('--num_truncated_iterations', default=1, type=int, help='Truncate iterations during BPTT to down-scale computation graph')
-parser.add_argument('--grad_accumulate_iterations', default=1, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations')
+parser.add_argument('--truncate_bptt', default=True, type=str2bool, help='Truncate iterations during BPTT to down-scale computation graph')
+parser.add_argument('--truncate_bptt_length', default=4, type=int, help='Perform BPTT for the given length (k1)')
+parser.add_argument('--grad_accumulate_iterations', default=1, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations') #100
+parser.add_argument('--enable_variable_grad_accumulation', default=True, type=str2bool, help='Configure gradient accumulation across full train sets of variable sizes')
+parser.add_argument('--reset_hidden_every_step', default=False, type=str2bool, help='Reset hidden state at every optimizer step')
 #parser.add_argument('--lstm_depth', default=128, type=int, help='Append lstm layer after FCN layers of retinaNet')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
 parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
@@ -257,7 +260,8 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
     activation = nn.Sigmoid().cuda()
     if args.loss_type == 'mbox':
         activation = nn.Softmax(dim=2).cuda()
-
+    reset_hidden = True
+    detach_state = True
     dict_for_json_dump = {}
 
     with torch.no_grad():
@@ -278,8 +282,9 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
 
 
 
-            decoded_boxes, conf_data = net(images)
-
+            decoded_boxes, conf_data = net(images, reset_hidden= reset_hidden, detach_state=detach_state)
+            reset_hidden = False
+            detach_state = False
             conf_scores_all = activation(conf_data).clone()
 
             if print_time and val_itr%val_step == 0:

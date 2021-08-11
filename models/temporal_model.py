@@ -12,9 +12,9 @@ class ConvLSTMBlock(nn.Module):
                                             num_layers=num_layers,
                                             batch_first=True, bias=bias, return_all_layers=False)
 
-    def forward(self, input, reset_hidden):
+    def forward(self, input, reset_hidden, detach_state):
         #out = torch.unsqueeze(input, 0)
-        out = self.convlstm(input, reset_hidden= reset_hidden)
+        out = self.convlstm(input, reset_hidden= reset_hidden, detach_state=detach_state)
         #out = torch.squeeze(out[0][0], 0)
         return out[0][0]
 
@@ -38,12 +38,12 @@ class TemporalLayer(nn.Module):
         self.td_batchnorm = TimeDistributed5D(nn.BatchNorm2d(inplanes).cuda(), timesteps)
         self.relu = nn.ReLU(True)
     def forward(self, input_tuple):
-        input, reset_hidden = input_tuple
-        out = self.convlstm(input, reset_hidden)
+        input, reset_hidden, detach_state = input_tuple
+        out = self.convlstm(input, reset_hidden, detach_state)
         out = self.td_conv2d(out)
         out = self.td_batchnorm(out)
         out = self.relu(out)
-        return out, reset_hidden
+        return out, reset_hidden, detach_state
 
 
 
@@ -76,8 +76,8 @@ class TemporalNet(nn.Module):
         net = nn.Sequential(*layers)
         return net
 
-    def forward(self, input, reset_hidden):
-        out = self.temporal_net((input, reset_hidden))
+    def forward(self, input, temporal_flags):
+        out = self.temporal_net((input, temporal_flags[0], temporal_flags[1]))
         out = self.td_conv_head(out[0])
         return out
 

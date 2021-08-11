@@ -104,7 +104,7 @@ class RetinaNet(nn.Module):
             else:
                 error('Define correct loss type')
 
-    def forward(self, images, gts=None, counts=None, get_features=False, reset_hidden=True):
+    def forward(self, images, gts=None, counts=None, get_features=False, reset_hidden=True, detach_state=True):
         sources = self.backbone_net(images)
         features = list()
         # pdb.set_trace()
@@ -129,7 +129,7 @@ class RetinaNet(nn.Module):
                 else:
                     reg_out = self.reg_heads(x)  # 2,25,45,36 (same as P3 w,h)
             else:
-                reg_out = self.get_temporal_output(self.reg_temporal[idx], x, reset_hidden)
+                reg_out = self.get_temporal_output(self.reg_temporal[idx], x, (reset_hidden,detach_state))
 
 
             if not self.append_cls_temporal_net:
@@ -138,7 +138,7 @@ class RetinaNet(nn.Module):
                 else:
                     cls_out = self.cls_heads(x)
             else:
-                cls_out = self.get_temporal_output(self.cls_temporal[idx], x, reset_hidden)
+                cls_out = self.get_temporal_output(self.cls_temporal[idx], x, (reset_hidden, detach_state))
 
 
             reg_out = reg_out.permute(0, 2, 3, 1).contiguous()
@@ -178,8 +178,8 @@ class RetinaNet(nn.Module):
 
         return out.view(batch * timesteps, channels, height, width)
 
-    def get_temporal_output(self, temporal_net, x, reset_hidden):
-        out = temporal_net(x, reset_hidden)
+    def get_temporal_output(self, temporal_net, x, temporal_flags):
+        out = temporal_net(x, temporal_flags)
         return self.collate_timesteps(out)
 
     def make_features(self, shared_heads):

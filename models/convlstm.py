@@ -53,6 +53,10 @@ class ConvLSTMCell(nn.Module):
         #torch.cuda.synchronize()
         combined_conv = self.conv(combined)
         cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, self.hidden_dim, dim=1)
+
+        #peephole connections
+        #cc_i =
+
         i = torch.sigmoid(cc_i)
         f = torch.sigmoid(cc_f)
         o = torch.sigmoid(cc_o)
@@ -65,8 +69,8 @@ class ConvLSTMCell(nn.Module):
 
     def init_hidden(self, batch_size, image_size):
         height, width = image_size
-        return (torch.zeros(batch_size, self.hidden_dim, height, width, device=self.conv.weight.device).cuda(),
-                torch.zeros(batch_size, self.hidden_dim, height, width, device=self.conv.weight.device).cuda())
+        return (torch.zeros(batch_size, self.hidden_dim, height, width, device=self.conv.weight.device, requires_grad=True).cuda(),
+                torch.zeros(batch_size, self.hidden_dim, height, width, device=self.conv.weight.device, requires_grad=True).cuda())
 
 
 class ConvLSTM(nn.Module):
@@ -129,7 +133,7 @@ class ConvLSTM(nn.Module):
 
         self.cell_list = nn.ModuleList(cell_list)
 
-    def forward(self, input_tensor, hidden_state=None, reset_hidden = False):
+    def forward(self, input_tensor, hidden_state=None, reset_hidden = False, detach_state=True):
         """
 
         Parameters
@@ -167,6 +171,12 @@ class ConvLSTM(nn.Module):
 
             h, c = self.hidden_state[layer_idx]
 
+            if detach_state:
+                h = h.detach()
+                c = c.detach()
+                h.requires_grad = True
+                c.requires_grad = True
+
             output_inner = []
             for t in range(seq_len):
                 h, c = self.cell_list[layer_idx](input_tensor=cur_layer_input[:, t, :, :, :],
@@ -178,6 +188,8 @@ class ConvLSTM(nn.Module):
 
             layer_output_list.append(layer_output)
             last_state_list.append([h, c])
+            self.hidden_state[layer_idx] = h, c
+
 
         if not self.return_all_layers:
             layer_output_list = layer_output_list[-1:]

@@ -84,11 +84,11 @@ parser.add_argument('--dataset', default='esad', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment
 parser.add_argument('--original_width', default=1920, type=int, help='Actual width of input')
 parser.add_argument('--original_height', default=1080, type=int, help='Actual height of input')
-parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN') #o: 600
+parser.add_argument('--min_size', default=200, type=int, help='Input Size for FPN') #o: 600
 parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation')
-parser.add_argument('--batch_size', default=4, type=int, help='Batch size for training') # o:16
+parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training') # o:16
 parser.add_argument('--shuffle', default=False, type=str2bool, help='Shuffle training data')
 
 # Number of worker to load data in parllel
@@ -99,7 +99,7 @@ parser.add_argument('--load_non_strict_pretrained', default=False, type=str2bool
 parser.add_argument('--freeze_cls_heads', default=False, type=str2bool, help='Freeze training of classification heads (excluding LSTM)')
 parser.add_argument('--freeze_reg_heads', default=False, type=str2bool, help='Freeze training of box regression heads (excluding LSTM)')
 parser.add_argument('--freeze_backbone', default=False, type=str2bool, help='Freeze training of resentFPN')
-parser.add_argument('--pretrained_iter', default=8225, type=int, help='Iteration at which pretraining was stopped') #17000
+parser.add_argument('--pretrained_iter', default=61100, type=int, help='Iteration at which pretraining was stopped') #17000
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
 parser.add_argument('--max_epochs', default=40, type=int, help='Number of epochs to run for')
 parser.add_argument('--max_iter', default=50000, type=int, help='Number of training iterations') #o:9000
@@ -119,8 +119,8 @@ parser.add_argument('--positive_threshold', default=0.6, type=float, help='Min J
 parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min Jaccard index for matching')
 
 # Evaluation hyperparameters
-parser.add_argument('--intial_val', default=4699, type=int, help='Initial number of training iterations before evaluation')
-parser.add_argument('--val_step', default=4699, type=int, help='Number of training iterations before evaluation') #b=16, 1ep= 1175it , total= 18800 .   b=8, 1ep=2350 it, total= 18800. b=4, 1ep=4699 total=18796
+parser.add_argument('--intial_val', default=1, type=int, help='Initial number of training iterations before evaluation')
+parser.add_argument('--val_step', default=1, type=int, help='Number of training iterations before evaluation') #b=16, 1ep= 1175it , total= 18800 .   b=8, 1ep=2350 it, total= 18800. b=4, 1ep=4699 total=18796
 parser.add_argument('--iou_thresh', default=0.30, type=float, help='Evaluation threshold') #For evaluation of val set, just check on AP50
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
@@ -303,6 +303,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     grad_accumulate_iterations = args.grad_accumulate_iterations
     truncate_bptt_length = args.truncate_bptt_length
     reset_hidden = False
+    detach_state = True
     if args.enable_variable_grad_accumulation:
         args.train_set_sizes = [int(math.floor(size/get_data_loader_batch_size(args))) for size in args.train_set_sizes]
         grad_accumulate_iterations = args.train_set_sizes[train_set_idx]
@@ -352,7 +353,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             # pdb.set_trace()
             # print(gts.shape, counts.shape, images.shape)
 
-            loss_l, loss_c, loss_p = net(images, gts, counts, reset_hidden= reset_hidden)
+            loss_l, loss_c, loss_p = net(images, gts, counts, reset_hidden= reset_hidden, detach_state=detach_state)
 
             loss_l, loss_c = loss_l.mean(), loss_c.mean()
 
@@ -372,6 +373,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
             torch.cuda.synchronize()
             reset_hidden = False
+            detach_state = False
             if accumulation_counter % grad_accumulate_iterations ==0:
                 print("Running optimizer step")
                 loss.backward()
@@ -387,14 +389,17 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                     train_set_idx += 1
                     grad_accumulate_iterations = args.train_set_sizes[train_set_idx % len(args.train_set_sizes)]
                     reset_hidden = True
+                    detach_state = True
 
                 elif step_counter * get_data_loader_batch_size(args) * grad_accumulate_iterations > args.train_set_sizes[train_set_idx % len(args.train_set_sizes)]:
                     train_set_idx += 1
                     step_counter = 0
                     reset_hidden = True
+                    detach_state = True
 
                 elif args.reset_hidden_every_step:
                     reset_hidden = True
+                    detach_state = True
 
                 accumulation_counter = 0
 
@@ -403,6 +408,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                 if not args.truncate_bptt or (args.truncate_bptt and accumulation_counter % truncate_bptt_length ==0):
                     loss.backward()
                     loss = torch.zeros(1, requires_grad=True).cuda()
+                    detach_state = True
                 scheduler.step()
 
             #loss.backward()
@@ -570,7 +576,8 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, iou_thresh
     activation = nn.Sigmoid().cuda()
     if args.loss_type == 'mbox':
         activation = nn.Softmax(dim=2).cuda()
-
+    reset_hidden = True
+    detach_state = True
     dict_for_json_dump = {}
 
     with torch.no_grad():
@@ -590,8 +597,9 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, iou_thresh
 
 
 
-            decoded_boxes, conf_data = net(images)
-
+            decoded_boxes, conf_data = net(images, reset_hidden= reset_hidden, detach_state=detach_state)
+            reset_hidden = False
+            detach_state = False
             conf_scores_all = activation(conf_data).clone()
 
             if print_time and val_itr%val_step == 0:
