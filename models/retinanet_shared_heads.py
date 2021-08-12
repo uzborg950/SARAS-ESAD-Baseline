@@ -104,7 +104,7 @@ class RetinaNet(nn.Module):
             else:
                 error('Define correct loss type')
 
-    def forward(self, images, gts=None, counts=None, get_features=False, reset_hidden=True, detach_state=True):
+    def forward(self, images, gts=None, counts=None, get_features=False,reg_hidden_states=None, cls_hidden_states=None):
         sources = self.backbone_net(images)
         features = list()
         # pdb.set_trace()
@@ -121,7 +121,8 @@ class RetinaNet(nn.Module):
         loc = list()
         conf = list()
         phases = list()
-
+        reg_hidden_states_pyramid = list()
+        cls_hidden_states_pyramid = list()
         for idx, x in enumerate(features):
             if not self.append_reg_temporal_net:
                 if self.time_distributed_backbone:
@@ -129,7 +130,9 @@ class RetinaNet(nn.Module):
                 else:
                     reg_out = self.reg_heads(x)  # 2,25,45,36 (same as P3 w,h)
             else:
-                reg_out = self.get_temporal_output(self.reg_temporal[idx], x, (reset_hidden,detach_state))
+                reg_out, reg_hidden_states_layer = self.get_temporal_output(self.reg_temporal[idx], x, reg_hidden_states[idx] if reg_hidden_states is not None else None)
+                reg_hidden_states_pyramid.append(reg_hidden_states_layer)
+
 
 
             if not self.append_cls_temporal_net:
@@ -138,7 +141,8 @@ class RetinaNet(nn.Module):
                 else:
                     cls_out = self.cls_heads(x)
             else:
-                cls_out = self.get_temporal_output(self.cls_temporal[idx], x, (reset_hidden, detach_state))
+                cls_out, cls_hidden_state_layer = self.get_temporal_output(self.cls_temporal[idx], x, cls_hidden_states[idx] if cls_hidden_states is not None else None)
+                cls_hidden_states_pyramid.append(cls_hidden_state_layer)
 
 
             reg_out = reg_out.permute(0, 2, 3, 1).contiguous()
@@ -163,9 +167,10 @@ class RetinaNet(nn.Module):
             return torch.stack([decode(flat_loc[b], anchor_boxes) for b in range(flat_loc.shape[0])],
                                0), flat_conf, features
         elif gts is not None:  # training mode
-            return self.criterion(flat_conf, flat_loc, gts, counts, anchor_boxes, images, predicted_phase=out_phase)
+            loss_l, loss_c, loss_p, = self.criterion(flat_conf, flat_loc, gts, counts, anchor_boxes, images, predicted_phase=out_phase)
+            return loss_l, loss_c, loss_p, reg_hidden_states_pyramid, cls_hidden_states_pyramid
         else:  # otherwise testing mode
-            return torch.stack([decode(flat_loc[b], anchor_boxes) for b in range(flat_loc.shape[0])], 0), flat_conf
+            return torch.stack([decode(flat_loc[b], anchor_boxes) for b in range(flat_loc.shape[0])], 0), flat_conf, reg_hidden_states_pyramid, cls_hidden_states_pyramid
 
     def collate_timesteps(self, out):
         batch, timesteps, channels, height, width = out.shape
@@ -178,9 +183,9 @@ class RetinaNet(nn.Module):
 
         return out.view(batch * timesteps, channels, height, width)
 
-    def get_temporal_output(self, temporal_net, x, temporal_flags):
-        out = temporal_net(x, temporal_flags)
-        return self.collate_timesteps(out)
+    def get_temporal_output(self, temporal_net, x, hidden_states):
+        out, hidden_states = temporal_net(x, hidden_states)
+        return self.collate_timesteps(out), hidden_states
 
     def make_features(self, shared_heads):
         layers = []

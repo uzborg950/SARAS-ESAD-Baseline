@@ -12,11 +12,12 @@ class ConvLSTMBlock(nn.Module):
                                             num_layers=num_layers,
                                             batch_first=True, bias=bias, return_all_layers=False)
 
-    def forward(self, input, reset_hidden, detach_state):
+    def forward(self, input, hidden_states):
         #out = torch.unsqueeze(input, 0)
-        out = self.convlstm(input, reset_hidden= reset_hidden, detach_state=detach_state)
-        #out = torch.squeeze(out[0][0], 0)
-        return out[0][0]
+        out = self.convlstm(input, hidden_states=hidden_states)
+
+        #return out[0][0]
+        return out[0], out[2]
 
     def _make_convlstm(self, input_dim, hidden_dim, kernel_size=(3, 3), num_layers=1, batch_first=True, bias=True,
                        return_all_layers=True):
@@ -38,12 +39,12 @@ class TemporalLayer(nn.Module):
         self.td_batchnorm = TimeDistributed5D(nn.BatchNorm2d(inplanes).cuda(), timesteps)
         self.relu = nn.ReLU(True)
     def forward(self, input_tuple):
-        input, reset_hidden, detach_state = input_tuple
-        out = self.convlstm(input, reset_hidden, detach_state)
-        out = self.td_conv2d(out)
+        input, hidden_states = input_tuple
+        convlstm_out = self.convlstm(input, hidden_states)
+        out = self.td_conv2d(convlstm_out[0][0])
         out = self.td_batchnorm(out)
         out = self.relu(out)
-        return out, reset_hidden, detach_state
+        return (out, convlstm_out[1])
 
 
 
@@ -64,7 +65,7 @@ class TemporalNet(nn.Module):
     def __init__(self, inplanes, outplanes, timesteps, use_bias, init_bg_prob=False, temporal_layers=2, convlstm_layers=1):
         super(TemporalNet, self).__init__()
         self.inplanes = inplanes
-        self.temporal_net = self._make_temporal_net(convlstm_layers, inplanes, temporal_layers, timesteps, use_bias)
+        self.temporal_layers = self._make_temporal_net(convlstm_layers, inplanes, temporal_layers, timesteps, use_bias)
 
         self.td_conv_head = TimeDistributed5D(make_conv2d(inplanes, outplanes, kernel_size=3, stride=1, padding=1, use_bias=use_bias,
                                            init_bg_prob=init_bg_prob).cuda(), timesteps)
@@ -73,13 +74,18 @@ class TemporalNet(nn.Module):
         layers = []
         for _ in range(temporal_layers):
             layers.append(TemporalLayer(inplanes,convlstm_layers, timesteps, use_bias))
-        net = nn.Sequential(*layers)
-        return net
 
-    def forward(self, input, temporal_flags):
-        out = self.temporal_net((input, temporal_flags[0], temporal_flags[1]))
+        return nn.ModuleList(layers)
+
+    def forward(self, input, hidden_states_layers):
+        hidden_states_layers_next = []
+        for idx, layer in enumerate(self.temporal_layers):
+            out = layer((input, hidden_states_layers[idx] if hidden_states_layers is not None else None))
+            hidden_states_layers_next.append(out[1])
+            input = out[0]
+
         out = self.td_conv_head(out[0])
-        return out
+        return out, hidden_states_layers_next
 
     def _conv1x1(self, in_channel, out_channel, bias):
         return nn.Conv2d(in_channel, out_channel, kernel_size=1, bias=bias)

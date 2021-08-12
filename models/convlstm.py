@@ -65,6 +65,9 @@ class ConvLSTMCell(nn.Module):
         c_next = f * c_cur + i * g
         h_next = o * torch.tanh(c_next)
 
+        if input_tensor.requires_grad:
+            c_next.retain_grad()
+            h_next.retain_grad()
         return h_next, c_next
 
     def init_hidden(self, batch_size, image_size):
@@ -120,7 +123,6 @@ class ConvLSTM(nn.Module):
         self.batch_first = batch_first
         self.bias = bias
         self.return_all_layers = return_all_layers
-        self.hidden_state = None
 
         cell_list = []
         for i in range(0, self.num_layers):
@@ -133,14 +135,14 @@ class ConvLSTM(nn.Module):
 
         self.cell_list = nn.ModuleList(cell_list)
 
-    def forward(self, input_tensor, hidden_state=None, reset_hidden = False, detach_state=True):
+    def forward(self, input_tensor, hidden_states=None):
         """
 
         Parameters
         ----------
         input_tensor: todo
             5-D Tensor either of shape (t, b, c, h, w) or (b, t, c, h, w)
-        hidden_state: todo
+        hidden_states: todo
             None. todo implement stateful
 
         Returns
@@ -154,11 +156,11 @@ class ConvLSTM(nn.Module):
         b, _, _, h, w = input_tensor.size()
 
         # Implement stateful ConvLSTM
-        if hidden_state is not None:
-            raise NotImplementedError()
-        elif self.hidden_state is None or reset_hidden:
+        #if hidden_states is not None:
+        #    hidden_states = [(hidden_states[0], hidden_states[1])]
+        if hidden_states is None: #TODO ADJUST RESET HIDDEN IN THE TRAINER AND EVALUATION
             # Since the init is done in forward. Can send image size here
-            self.hidden_state = self._init_hidden(batch_size=b,
+            hidden_states = self._init_hidden(batch_size=b,
                                              image_size=(h, w))
 
         layer_output_list = []
@@ -169,13 +171,13 @@ class ConvLSTM(nn.Module):
 
         for layer_idx in range(self.num_layers):
 
-            h, c = self.hidden_state[layer_idx]
+            h, c = hidden_states[layer_idx]
 
-            if detach_state:
-                h = h.detach()
-                c = c.detach()
-                h.requires_grad = True
-                c.requires_grad = True
+            #if detach_state: #TODO ADJUST THIS IN THE TRAINER
+            #    h = h.detach()
+            #    c = c.detach()
+            #    h.requires_grad = True
+            #    c.requires_grad = True
 
             output_inner = []
             for t in range(seq_len):
@@ -188,14 +190,14 @@ class ConvLSTM(nn.Module):
 
             layer_output_list.append(layer_output)
             last_state_list.append([h, c])
-            self.hidden_state[layer_idx] = h, c
+            hidden_states[layer_idx] = h, c
 
 
         if not self.return_all_layers:
             layer_output_list = layer_output_list[-1:]
             last_state_list = last_state_list[-1:]
 
-        return layer_output_list, last_state_list
+        return layer_output_list, last_state_list, hidden_states
 
     def _init_hidden(self, batch_size, image_size):
         init_states = []

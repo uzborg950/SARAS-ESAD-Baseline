@@ -49,17 +49,18 @@ parser.add_argument('--bin_loss', default=True, type=str2bool,help='Include bina
 parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, help='predict surgical phase as well')
 parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')
 # Use Time Distribution for CNN backbone
-parser.add_argument('--time_distributed_backbone', default=False, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
-parser.add_argument('--temporal_slice_timesteps', default=4, type=int, help='Number of timesteps/frame comprising a temporal slice')
-# Use LSTM
-parser.add_argument('--append_cls_temporal_net', default=False, type=str2bool, help='Append cls temporal model after FPN, before cls predictor conv head')
-parser.add_argument('--append_reg_temporal_net', default=False, type=str2bool, help='Append regression temporal model after FPN, before regression predictor conv head')
+parser.add_argument('--time_distributed_backbone', default=True, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
+parser.add_argument('--temporal_slice_timesteps', default=2, type=int, help='Number of timesteps/frame comprising a temporal slice')
+# Use ConvLSTM
+parser.add_argument('--append_cls_temporal_net', default=True, type=str2bool, help='Append cls temporal model after FPN, before cls predictor conv head')
+parser.add_argument('--append_reg_temporal_net', default=True, type=str2bool, help='Append regression temporal model after FPN, before regression predictor conv head')
 parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
 parser.add_argument('--truncate_bptt', default=True, type=str2bool, help='Truncate iterations during BPTT to down-scale computation graph')
-parser.add_argument('--truncate_bptt_length', default=4, type=int, help='Perform BPTT for the given length (k1)')
+parser.add_argument('--k1', default=4, type=int, help='Number of forward pass timesteps between updates')
+parser.add_argument('--k2', default=4, type=int, help='Number of timesteps to apply bptt to')
 parser.add_argument('--grad_accumulate_iterations', default=1, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations') #100
-parser.add_argument('--enable_variable_grad_accumulation', default=True, type=str2bool, help='Configure gradient accumulation across full train sets of variable sizes')
+parser.add_argument('--enable_variable_grad_accumulation', default=False, type=str2bool, help='Configure gradient accumulation across full train sets of variable sizes')
 parser.add_argument('--reset_hidden_every_step', default=False, type=str2bool, help='Reset hidden state at every optimizer step')
 #parser.add_argument('--lstm_depth', default=128, type=int, help='Append lstm layer after FCN layers of retinaNet')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
@@ -72,18 +73,18 @@ parser.add_argument('--dataset', default='esad', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment
 parser.add_argument('--original_width', default=1920, type=int, help='Actual width of input')
 parser.add_argument('--original_height', default=1080, type=int, help='Actual height of input')
-parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
+parser.add_argument('--min_size', default=200, type=int, help='Input Size for FPN')
 parser.add_argument('--max_size', default=1080, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation')
-parser.add_argument('--batch_size', default=4, type=int, help='Batch size for training')
+parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=8, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--loss_type', default='focal', type=str, help='loss_type')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
-parser.add_argument('--eval_iters', default='14000', type=str, help='Chnage the lr @')#5000,6000,7000,9000
+parser.add_argument('--eval_iters', default='4699', type=str, help='Chnage the lr @')#5000,6000,7000,9000
 
 # Freeze batch normlisatio layer or not 
 parser.add_argument('--fbn', default=True, type=bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
@@ -140,9 +141,11 @@ def main():
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
     if True: # while validating
-        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=True, include_phase=args.predict_surgical_phase)
+        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=True, include_phase=args.predict_surgical_phase, batch=get_data_loader_batch_size(
+            args))
     else: # while testing
-        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['testC'], transform=val_transform, full_test=True, include_phase=args.predict_surgical_phase)
+        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['testC'], transform=val_transform, full_test=True, include_phase=args.predict_surgical_phase, batch=get_data_loader_batch_size(
+            args))
 
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
 
@@ -180,8 +183,9 @@ def main():
 
         print('Finished loading model %d !' % iteration)
         # Load dataset
-        val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1, num_workers=args.num_workers,
-                                                shuffle=False, pin_memory=True, collate_fn=partial(custom_collate, timesteps = args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1))
+        val_data_loader = data_utils.DataLoader(val_dataset, get_data_loader_batch_size(args), num_workers=args.num_workers,
+                                                shuffle=False, pin_memory=True, collate_fn=partial(custom_collate, timesteps =get_data_loader_batch_size(
+            args)))
 
         # evaluation
         torch.cuda.synchronize()
@@ -243,6 +247,9 @@ def main():
     fid.close()
 
 
+def get_data_loader_batch_size(args):
+    #return args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1
+    return args.batch_size if not args.time_distributed_backbone else args.batch_size * args.temporal_slice_timesteps
 
 def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission_file, iou_threshs=[0.2,0.25,0.3,0.4,0.5,0.75]):
     """Test a FPN network on an image database."""
@@ -260,10 +267,10 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
     activation = nn.Sigmoid().cuda()
     if args.loss_type == 'mbox':
         activation = nn.Softmax(dim=2).cuda()
-    reset_hidden = True
-    detach_state = True
-    dict_for_json_dump = {}
 
+    dict_for_json_dump = {}
+    reg_hidden_states = None
+    cls_hidden_states = None
     with torch.no_grad():
         for val_itr, (images, targets, batch_counts, img_indexs, wh) in enumerate(val_data_loader):
 
@@ -275,16 +282,15 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
             if args.time_distributed_backbone:
                 _, channels, height, width = images.shape
                 images = construct_temporal_batches(images, args.batch_size, args.temporal_slice_timesteps)
-                targets, counts = generate_temporal_gts(targets, batch_counts, args.batch_size, args.temporal_slice_timesteps)
+                #targets, counts = generate_temporal_gts(targets, batch_counts, args.batch_size, args.temporal_slice_timesteps)
 
             images = images.cuda(0, non_blocking=True)
 
 
 
 
-            decoded_boxes, conf_data = net(images, reset_hidden= reset_hidden, detach_state=detach_state)
-            reset_hidden = False
-            detach_state = False
+            decoded_boxes, conf_data, reg_hidden_states, cls_hidden_states = net(images, reg_hidden_states=reg_hidden_states, cls_hidden_states=cls_hidden_states)
+
             conf_scores_all = activation(conf_data).clone()
 
             if print_time and val_itr%val_step == 0:
@@ -374,11 +380,12 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
 
 def construct_temporal_batches(images, batch_size, timesteps):
     _, channels, height, width = images.shape
-    images_td = torch.tensor([])
-    for seq_idx in range(batch_size):
-        seq = images[seq_idx:seq_idx + timesteps, :,:,:]
-        images_td = torch.cat((images_td, torch.unsqueeze(seq, 0)), 0)
-    return images_td
+    #images_td = torch.tensor([])
+    #for seq_idx in range(batch_size):
+    #    seq = images[seq_idx:seq_idx + timesteps, :,:,:]
+    #    images_td = torch.cat((images_td, torch.unsqueeze(seq, 0)), 0)
+    #return images_td
+    return images.view(batch_size, timesteps, channels, height, width)
 
 def generate_temporal_gts(gts, counts, batch_size, timesteps):
     timestep_gts = torch.tensor([], dtype=torch.int64)
