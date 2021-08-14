@@ -62,7 +62,7 @@ parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, he
 parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')
 # Use Time Distribution for CNN backbone
 parser.add_argument('--time_distributed_backbone', default=True, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
-parser.add_argument('--temporal_slice_timesteps', default=2, type=int, help='Number of timesteps/frame comprising a temporal slice')
+parser.add_argument('--temporal_slice_timesteps', default=1, type=int, help='Number of timesteps/frame comprising a temporal slice')
 # Use ConvLSTM
 parser.add_argument('--append_cls_temporal_net', default=True, type=str2bool, help='Append cls temporal model after FPN, before cls predictor conv head')
 parser.add_argument('--append_reg_temporal_net', default=True, type=str2bool, help='Append regression temporal model after FPN, before regression predictor conv head')
@@ -100,15 +100,15 @@ parser.add_argument('--load_non_strict_pretrained', default=False, type=str2bool
 parser.add_argument('--freeze_cls_heads', default=False, type=str2bool, help='Freeze training of classification heads (excluding LSTM)')
 parser.add_argument('--freeze_reg_heads', default=False, type=str2bool, help='Freeze training of box regression heads (excluding LSTM)')
 parser.add_argument('--freeze_backbone', default=False, type=str2bool, help='Freeze training of resentFPN')
-parser.add_argument('--pretrained_iter', default=4699, type=int, help='Iteration at which pretraining was stopped') #17000
+parser.add_argument('--pretrained_iter', default=8225, type=int, help='Iteration at which pretraining was stopped') #17000
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
 parser.add_argument('--max_epochs', default=40, type=int, help='Number of epochs to run for')
-parser.add_argument('--max_iter', default=50000, type=int, help='Number of training iterations') #o:9000
+parser.add_argument('--max_iter', default=375920, type=int, help='Number of training iterations') #o:9000
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate') #0.01
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--loss_type', default='focal', type=str, help='loss_type')  # o:mbox
-parser.add_argument('--milestones', default='11000,22000,33000,44000', type=str, help='Chnage the lr @')#6000,8000,12000,18000 ; train set 1 only 3500,6000,9000,12000 ;
-parser.add_argument('--gammas', default='0.1,0.1,0.1,0.1', type=str, help='Gamma update for SGD')
+parser.add_argument('--milestones', default='93970,187940,281910', type=str, help='Chnage the lr @')#6000,8000,12000,18000 ; train set 1 only 3500,6000,9000,12000 ;
+parser.add_argument('--gammas', default='0.1,0.1,0.1', type=str, help='Gamma update for SGD')
 parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay for SGD')
 
 # Freeze layers or not 
@@ -120,8 +120,8 @@ parser.add_argument('--positive_threshold', default=0.6, type=float, help='Min J
 parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min Jaccard index for matching')
 
 # Evaluation hyperparameters
-parser.add_argument('--intial_val', default=4699, type=int, help='Initial number of training iterations before evaluation')
-parser.add_argument('--val_step', default=4699, type=int, help='Number of training iterations before evaluation') #b=16, 1ep= 1175it , total= 18800 .   b=8, 1ep=2350 it, total= 18800. b=4, 1ep=4699 total=18796
+parser.add_argument('--intial_val', default=93970, type=int, help='Initial number of training iterations before evaluation')
+parser.add_argument('--val_step', default=93970, type=int, help='Number of training iterations before evaluation') #b=16, 1ep= 1175it , total= 18800 .   b=8, 1ep=2350 it, total= 18800. b=4, 1ep=4699 total=18796. b=2, 1ep=9397 total=18794
 parser.add_argument('--iou_thresh', default=0.30, type=float, help='Evaluation threshold') #For evaluation of val set, just check on AP50
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
@@ -135,7 +135,7 @@ parser.add_argument('--tensorboard', default=True, type=str2bool, help='Use tens
 # Program arguments
 parser.add_argument('--man_seed', default=123, type=int, help='manualseed for reproduction')
 
-parser.add_argument('--multi_gpu', default=True, type=str2bool, help='If  more than 0 then use all visible GPUs by default only one GPU used ') 
+parser.add_argument('--multi_gpu', default=True, type=str2bool, help='If  more than 0 then use all visible GPUs by default only one GPU used ')
 
 # Use CUDA_VISIBLE_DEVICES=0,1,4,6 to select GPUs to use
 parser.add_argument('--data_root', default='../', help='Location to root directory fo dataset') # /mnt/mars-fast/datasets/
@@ -300,7 +300,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     batch_fill_count = 0
     accumulation_counter = 0
     current_cls_loss = {}
-    step_counter = 1
+    step_counter = 0
     grad_accumulate_iterations = args.k1
     k2 = args.k2
     retain_graph = args.k1 < args.k2 and args.truncate_bptt
@@ -371,7 +371,8 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                         cls_c.detach_()
                         cls_h.requires_grad = True
                         cls_c.requires_grad = True
-
+            #print("printing images size:")
+            #print(images.shape[0] * images.shape[1])
             loss_l, loss_c, loss_p, reg_hidden_states, cls_hidden_states = net(images, gts, counts, reg_hidden_states=reg_hidden_states, cls_hidden_states=cls_hidden_states)
 
             loss_l, loss_c = loss_l.mean(), loss_c.mean()
@@ -415,6 +416,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                                 h_grad = reg_h.grad
                                 c_grad = reg_c.grad
                                 reg_h_prev, reg_c_prev = reg_temp_layer_prev[0]
+                                #print("reg_h_prev shape: ", reg_h_prev.shape, reg_h_prev.device)
                                 reg_h_prev.backward(h_grad, retain_graph=retain_graph)
                                 reg_c_prev.backward(c_grad, retain_graph=retain_graph)
 
@@ -430,6 +432,8 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
                     step_counter += 1
                     if step_counter * get_data_loader_batch_size(args) * grad_accumulate_iterations > args.train_set_sizes[train_set_idx % len(args.train_set_sizes)]:
+                        train_set_idx += 1
+                        step_counter = 0
                         states = []
                         reg_hidden_states = None
                         cls_hidden_states = None
@@ -440,7 +444,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
                     torch.cuda.synchronize()
 
-
+                    step_counter += 1
                     if args.enable_variable_grad_accumulation:
                         train_set_idx += 1
                         grad_accumulate_iterations = args.train_set_sizes[train_set_idx % len(args.train_set_sizes)]
