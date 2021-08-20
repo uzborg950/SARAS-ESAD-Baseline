@@ -58,7 +58,7 @@ parser.add_argument('--basenet', default='resnet18', help='pretrained base model
 #Binary classification loss
 parser.add_argument('--bin_loss', default=True, type=str2bool, help='Include binary classification loss (object/background')
 # Multi-Task Surgical Phase Detection
-parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, help='predict surgical phase as well')
+parser.add_argument('--predict_surgical_phase', default=True, type=str2bool, help='predict surgical phase as well')
 parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')
 # Use Time Distribution for CNN backbone
 parser.add_argument('--time_distributed_backbone', default=True, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
@@ -102,12 +102,12 @@ parser.add_argument('--freeze_reg_heads', default=False, type=str2bool, help='Fr
 parser.add_argument('--freeze_backbone', default=False, type=str2bool, help='Freeze training of resentFPN')
 parser.add_argument('--pretrained_iter', default=8225, type=int, help='Iteration at which pretraining was stopped') #17000
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
-parser.add_argument('--max_epochs', default=40, type=int, help='Number of epochs to run for')
-parser.add_argument('--max_iter', default=375920, type=int, help='Number of training iterations') #o:9000
+parser.add_argument('--max_epochs', default=90, type=int, help='Number of epochs to run for')
+parser.add_argument('--max_iter', default=845730, type=int, help='Number of training iterations') #o:9000
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate') #0.01
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--loss_type', default='focal', type=str, help='loss_type')  # o:mbox
-parser.add_argument('--milestones', default='93970,187940,281910', type=str, help='Chnage the lr @')#6000,8000,12000,18000 ; train set 1 only 3500,6000,9000,12000 ;
+parser.add_argument('--milestones', default='375880,751760,820000', type=str, help='Chnage the lr @')#6000,8000,12000,18000 ; train set 1 only 3500,6000,9000,12000 ;
 parser.add_argument('--gammas', default='0.1,0.1,0.1', type=str, help='Gamma update for SGD')
 parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay for SGD')
 
@@ -120,8 +120,8 @@ parser.add_argument('--positive_threshold', default=0.6, type=float, help='Min J
 parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min Jaccard index for matching')
 
 # Evaluation hyperparameters
-parser.add_argument('--intial_val', default=93970, type=int, help='Initial number of training iterations before evaluation')
-parser.add_argument('--val_step', default=93970, type=int, help='Number of training iterations before evaluation') #b=16, 1ep= 1175it , total= 18800 .   b=8, 1ep=2350 it, total= 18800. b=4, 1ep=4699 total=18796. b=2, 1ep=9397 total=18794
+parser.add_argument('--intial_val', default=9397, type=int, help='Initial number of training iterations before evaluation')
+parser.add_argument('--val_step', default=9397, type=int, help='Number of training iterations before evaluation') #b=16, 1ep= 1175it , total= 18800 .   b=8, 1ep=2350 it, total= 18800. b=4, 1ep=4699 total=18796. b=2, 1ep=9397 total=18794
 parser.add_argument('--iou_thresh', default=0.30, type=float, help='Evaluation threshold') #For evaluation of val set, just check on AP50
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')

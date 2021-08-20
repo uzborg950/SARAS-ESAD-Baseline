@@ -1,57 +1,43 @@
-import math
 import torch
 import torch.nn as nn
-
 import modules.image_utils as img_utils
 import modules.resnet_utils as resnet_utils
-from models.time_distributed import TimeDistributed3D
-
-
-class PhaseHead(nn.Module):
-    def __init__(self, input_dim, inplanes, num_phases, temporal_slice_timesteps):
-        super(PhaseHead, self).__init__()
-        self.height = input_dim[1]
-        self.width = input_dim[0]
-        self.inplanes= inplanes
-        self.td_fc1 = TimeDistributed3D(nn.Linear(self.height * self.width * self.inplanes, 128), temporal_slice_timesteps) #Multiply channels too
-        self.relu = nn.ReLU(True)
-
-        self.td_fc2 = TimeDistributed3D(nn.Linear(128, num_phases), temporal_slice_timesteps)
-
-    def forward(self, input):
-        input = input.view(input.shape[0],input.shape[1],-1)
-        out = self.td_fc1(input)
-        out = self.relu(out)
-        out = self.td_fc2(out)
-        return out
 
 
 class PhaseNet(nn.Module):
-    def __init__(self, temporal_cls_backbone, inplanes, args):
+    def __init__(self, cls_inplanes, args):
         super(PhaseNet, self).__init__()
+        self.num_classes = args.num_classes
         self.num_phases = args.num_phases
-        self.temporal_cls_backbone = temporal_cls_backbone
-        self.feature_layers = args.predictor_layers
-        self.phase_heads = nn.ModuleList(self._make_phase_heads(args, inplanes))
-        self.fc = nn.Linear(len(self.feature_layers) * self.num_phases, self.num_phases)
+        self.fpn_output_layers = args.predictor_layers
 
-    def _make_phase_heads(self, args, inplanes):
-        phase_heads = []
-        for feature_layer in self.feature_layers:
-            dim = img_utils.get_size((args.original_width, args.original_height), args.min_size, args.max_size)
-            dim = resnet_utils.get_dimensions(dim, feature_layer)
-            phase_head = PhaseHead(dim, inplanes, self.num_phases, args.temporal_slice_timesteps).cuda()
-            phase_heads.append(phase_head)
+        input_dim = img_utils.get_size((args.original_width, args.original_height), args.min_size, args.max_size)
+        self.phase_tail = self.make_phase_tail(input_dim, cls_inplanes)
+        self.phase_head = nn.Linear(self.num_classes, self.num_phases)
+        self.bn = nn.BatchNorm1d(self.num_classes)
+        self.relu = nn.ReLU(inplace=True)
 
-    def forward(self, feature_layer_inputs):
-        phase_out = []
-        for layer_num, feature in enumerate(feature_layer_inputs):
-            cls_out = self.temporal_cls_backbone(feature)
-            #cls_out = torch.flatten(cls_out, start_dim=1)
-            phase_out.append(self.phase_heads[layer_num](cls_out))
+        self._init_hidden_units(self.phase_tail, init='he')
+        self._init_hidden_units(self.phase_head, init='normal')
 
-        phase = torch.cat([o.reshape(o.size(0) * o.size(1), -1) for o in phase_out], 1)
-        out_phase = self.fc(phase)
+    def _init_hidden_units(self, hidden_units, init):
+        nn.init.constant(hidden_units.bias, 0.0)
+
+        if init == 'he':
+            nn.init.kaiming_uniform_(hidden_units.weight, a=1)
+        elif init == 'normal':
+            nn.init.normal_(hidden_units.weight, mean=0, std=0.01)
+    def make_phase_tail(self, input_dim, cls_inplanes):
+        flat_cls_output_dim = 0
+        for fpn_output_layer in self.fpn_output_layers:
+            fpn_output_dim = resnet_utils.get_dimensions(input_dim, fpn_output_layer)
+            flattened_dim = fpn_output_dim[0] * fpn_output_dim[1] * cls_inplanes
+            flat_cls_output_dim += flattened_dim
+        return nn.Linear(flat_cls_output_dim, self.num_classes)
+
+    def forward(self, flat_cls_output):
+        out = self.phase_tail(torch.flatten(flat_cls_output, start_dim=1))
+        out = self.bn(out) #To avoid extremely large values, otherwise relu never gets a chance to act non-linear and zero out
+        out = self.relu(out)
+        out_phase = self.phase_head(out)
         return out_phase
-
-

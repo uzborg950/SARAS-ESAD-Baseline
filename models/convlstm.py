@@ -140,10 +140,10 @@ class ConvLSTM(nn.Module):
 
         Parameters
         ----------
-        input_tensor: todo
+        input_tensor:
             5-D Tensor either of shape (t, b, c, h, w) or (b, t, c, h, w)
-        hidden_states: todo
-            None. todo implement stateful
+        hidden_states:
+            States from the previous mini-batch
 
         Returns
         -------
@@ -158,7 +158,7 @@ class ConvLSTM(nn.Module):
         # Implement stateful ConvLSTM
         #if hidden_states is not None:
         #    hidden_states = [(hidden_states[0], hidden_states[1])]
-        if hidden_states is None: #TODO ADJUST RESET HIDDEN IN THE TRAINER AND EVALUATION
+        if hidden_states is None:
             # Since the init is done in forward. Can send image size here
             hidden_states = self._init_hidden(batch_size=b,
                                              image_size=(h, w))
@@ -172,12 +172,6 @@ class ConvLSTM(nn.Module):
         for layer_idx in range(self.num_layers):
 
             h, c = hidden_states[layer_idx]
-
-            #if detach_state: #TODO ADJUST THIS IN THE TRAINER
-            #    h = h.detach()
-            #    c = c.detach()
-            #    h.requires_grad = True
-            #    c.requires_grad = True
 
             output_inner = []
             for t in range(seq_len):

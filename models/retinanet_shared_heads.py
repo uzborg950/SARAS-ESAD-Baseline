@@ -86,8 +86,8 @@ class RetinaNet(nn.Module):
             self.cls_temporal = nn.ModuleList([TemporalNet(self.head_size, self.ar * self.num_classes, self.temporal_slice_timesteps, use_bias=self.use_bias,
                                             init_bg_prob=True, temporal_layers=self.temporal_net_layers,
                                             convlstm_layers=self.convlstm_layers) for _ in args.predictor_layers])
-            if self.include_phase: #TODO ADAPT FOR MULTIPLE TEMPORAL NETS
-                self.phase_temporal = PhaseNet(self.cls_temporal, self.ar * self.num_classes, args)
+            if self.include_phase:
+                self.phase_temporal = PhaseNet(self.ar * self.num_classes, args)
 
         #if args.loss_type != 'mbox':
         #    self.prior_prob = 0.01
@@ -160,7 +160,7 @@ class RetinaNet(nn.Module):
 
         out_phase = None
         if self.append_cls_temporal_net and self.include_phase:
-            out_phase = self.phase_temporal(features)
+            out_phase = self.phase_temporal(flat_conf)
         # pdb.set_trace()
 
         if get_features:  # testing mode with feature return
