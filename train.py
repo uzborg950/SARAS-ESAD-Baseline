@@ -27,7 +27,7 @@ import datetime
 import os
 import time
 import math
-
+import copy
 import numpy as np
 import torch
 import torch.nn as nn
@@ -58,22 +58,24 @@ parser.add_argument('--basenet', default='resnet18', help='pretrained base model
 #Binary classification loss
 parser.add_argument('--bin_loss', default=True, type=str2bool, help='Include binary classification loss (object/background')
 # Multi-Task Surgical Phase Detection
-parser.add_argument('--predict_surgical_phase', default=True, type=str2bool, help='predict surgical phase as well')
+parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, help='predict surgical phase as well')
 parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')
 # Use Time Distribution for CNN backbone
 parser.add_argument('--time_distributed_backbone', default=True, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
-parser.add_argument('--temporal_slice_timesteps', default=1, type=int, help='Number of timesteps/frame comprising a temporal slice')
+parser.add_argument('--temporal_slice_timesteps', default=2, type=int, help='Number of timesteps/frame comprising a temporal slice')
 # Use ConvLSTM
 parser.add_argument('--append_cls_temporal_net', default=True, type=str2bool, help='Append cls temporal model after FPN, before cls predictor conv head')
 parser.add_argument('--append_reg_temporal_net', default=True, type=str2bool, help='Append regression temporal model after FPN, before regression predictor conv head')
 parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of stacked convlstm layers')
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
-parser.add_argument('--truncate_bptt', default=True, type=str2bool, help='Truncate iterations during BPTT to down-scale computation graph')
-parser.add_argument('--k1', default=4, type=int, help='Number of forward pass timesteps between updates')
-parser.add_argument('--k2', default=4, type=int, help='Number of timesteps to apply bptt to')
+parser.add_argument('--truncate_bptt', default=True, type=str2bool, help='Truncate iterations during BPTT to down-scale computation graph') #True
+parser.add_argument('--k1', default=1, type=int, help='Number of forward pass timesteps between updates')
+parser.add_argument('--k2', default=3, type=int, help='Number of timesteps to apply bptt to')
 parser.add_argument('--grad_accumulate_iterations', default=1, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations') #100
 parser.add_argument('--enable_variable_grad_accumulation', default=False, type=str2bool, help='Configure gradient accumulation across full train sets of variable sizes')
-parser.add_argument('--reset_hidden_every_step', default=False, type=str2bool, help='Reset hidden state at every optimizer step')
+parser.add_argument('--override_optimization_steps_tbptt', default=False, type=str2bool, help='Override when optimization is run in TBPTT')#False
+parser.add_argument('--overrided_optimization_steps', default=10, type=int, help='Override when optimization is run in TBPTT')#False
+parser.add_argument('--reset_hidden_every_step', default=False, type=str2bool, help='Reset hidden state at every optimizer step')#False
 #parser.add_argument('--lstm_depth', default=198, type=int, help='Append lstm layer after FCN layers of retinaNet')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
 parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
@@ -90,7 +92,7 @@ parser.add_argument('--max_size', default=1080, type=int, help='Input Size for F
 #  data loading argumnets
 parser.add_argument('--shifted_mean', default=False, type=str2bool, help='Shift mean and std dev during normalisation')
 parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training') # o:16
-parser.add_argument('--shuffle', default=False, type=str2bool, help='Shuffle training data')
+parser.add_argument('--shuffle', default=False, type=str2bool, help='Shuffle training data') #False
 
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of workers used in dataloading')
@@ -100,14 +102,14 @@ parser.add_argument('--load_non_strict_pretrained', default=False, type=str2bool
 parser.add_argument('--freeze_cls_heads', default=False, type=str2bool, help='Freeze training of classification heads (excluding LSTM)')
 parser.add_argument('--freeze_reg_heads', default=False, type=str2bool, help='Freeze training of box regression heads (excluding LSTM)')
 parser.add_argument('--freeze_backbone', default=False, type=str2bool, help='Freeze training of resentFPN')
-parser.add_argument('--pretrained_iter', default=8225, type=int, help='Iteration at which pretraining was stopped') #17000
+parser.add_argument('--pretrained_iter', default=50525, type=int, help='Iteration at which pretraining was stopped') #17000
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
 parser.add_argument('--max_epochs', default=90, type=int, help='Number of epochs to run for')
-parser.add_argument('--max_iter', default=845730, type=int, help='Number of training iterations') #o:9000
+parser.add_argument('--max_iter', default=422910, type=int, help='Number of training iterations') #b=16 105750; b=8 211500 ;b=4: 422910; b=2 845730
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate') #0.01
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--loss_type', default='focal', type=str, help='loss_type')  # o:mbox
-parser.add_argument('--milestones', default='375880,751760,820000', type=str, help='Chnage the lr @')#6000,8000,12000,18000 ; train set 1 only 3500,6000,9000,12000 ;
+parser.add_argument('--milestones', default='46990,93980,140970', type=str, help='Chnage the lr @')#b=16  '11750, 23500, 35250';b=8 '23500,47000,70500'; b=4 '46990,93980,140970'; b=2 '93970, 187940, 281910'
 parser.add_argument('--gammas', default='0.1,0.1,0.1', type=str, help='Gamma update for SGD')
 parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay for SGD')
 
@@ -120,8 +122,8 @@ parser.add_argument('--positive_threshold', default=0.6, type=float, help='Min J
 parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min Jaccard index for matching')
 
 # Evaluation hyperparameters
-parser.add_argument('--intial_val', default=9397, type=int, help='Initial number of training iterations before evaluation')
-parser.add_argument('--val_step', default=9397, type=int, help='Number of training iterations before evaluation') #b=16, 1ep= 1175it , total= 18800 .   b=8, 1ep=2350 it, total= 18800. b=4, 1ep=4699 total=18796. b=2, 1ep=9397 total=18794
+parser.add_argument('--intial_val', default=4699, type=int, help='Initial number of training iterations before evaluation')
+parser.add_argument('--val_step', default=4699, type=int, help='Number of training iterations before evaluation') #b=16, 1ep= 1175it , total= 18800 .   b=8, 1ep=2350 it, total= 18800. b=4, 1ep=4699 total=18796. b=2, 1ep=9397 total=18794
 parser.add_argument('--iou_thresh', default=0.30, type=float, help='Evaluation threshold') #For evaluation of val set, just check on AP50
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
@@ -301,16 +303,20 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     accumulation_counter = 0
     current_cls_loss = {}
     step_counter = 0
-    grad_accumulate_iterations = args.k1
+    grad_accumulate_iterations = args.grad_accumulate_iterations
+    if args.truncate_bptt:
+        grad_accumulate_iterations = args.k1
     k2 = args.k2
     retain_graph = args.k1 < args.k2 and args.truncate_bptt
 
     if args.enable_variable_grad_accumulation:
         args.train_set_sizes = [int(math.floor(size/get_data_loader_batch_size(args))) for size in args.train_set_sizes]
         grad_accumulate_iterations = args.train_set_sizes[train_set_idx]
-    reg_hidden_states = None
-    cls_hidden_states = None
+    current_reg_hidden_states = None
+    current_cls_hidden_states = None
     states = []
+    torch.autograd.set_detect_anomaly(True)
+    data_store = []
     while iteration <= args.max_iter or epoch < args.max_epochs:
         epoch +=1
         for i, (images, gts, counts, image_ids, _) in enumerate(train_data_loader):
@@ -349,7 +355,10 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             accumulation_counter += 1
             data_time.update(time.perf_counter() - start)
 
-
+            if args.truncate_bptt:
+                if len(data_store) > k2:
+                    del data_store[0]
+                data_store.append((images.cpu(), gts.cpu(), counts.cpu()))
 
             # print(images.size(), anchors.size())
 
@@ -357,23 +366,11 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             # print(gts.shape, counts.shape, images.shape)
 
             if args.truncate_bptt and states:
-                reg_hidden_states, cls_hidden_states = states[-1]
-                for reg_hidden, cls_hidden in zip(reg_hidden_states, cls_hidden_states):
-                    for reg_temp_layer, cls_temp_layer in zip(reg_hidden, cls_hidden):
-                        reg_h, reg_c = reg_temp_layer[0] #Hard coded for now to assume single layer convlstm block
-                        reg_h.detach_()
-                        reg_c.detach_()
-                        reg_h.requires_grad=True
-                        reg_c.requires_grad=True
+                current_cls_hidden_states, current_reg_hidden_states = detach_ith_states(states, -1)
 
-                        cls_h, cls_c = cls_temp_layer[0]
-                        cls_h.detach_()
-                        cls_c.detach_()
-                        cls_h.requires_grad = True
-                        cls_c.requires_grad = True
             #print("printing images size:")
             #print(images.shape[0] * images.shape[1])
-            loss_l, loss_c, loss_p, reg_hidden_states, cls_hidden_states = net(images, gts, counts, reg_hidden_states=reg_hidden_states, cls_hidden_states=cls_hidden_states)
+            loss_l, loss_c, loss_p, new_reg_hidden_states, new_cls_hidden_states,full_init_reg_hidden_states, full_init_cls_hidden_states = net(images, gts, counts, reg_hidden_states=current_reg_hidden_states, cls_hidden_states=current_cls_hidden_states)
 
             loss_l, loss_c = loss_l.mean(), loss_c.mean()
 
@@ -383,7 +380,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             else:
                 loss_t = loss_l + loss_c #+ loss
 
-            loss = loss + loss_t / grad_accumulate_iterations
+            loss = loss_t#loss + loss_t / grad_accumulate_iterations
             #if count_update - args.num_truncated_iterations == 500:
             #    count_update = 0
             #    loss = torch.zeros(1, requires_grad=True, device='cuda:0')
@@ -392,24 +389,30 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
             #    scheduler.reduce_lr()
 
             torch.cuda.synchronize()
-            states.append((reg_hidden_states, cls_hidden_states))
+            if not states: #TODO TEST DATA FLOW OF init_reg_hidden_states, init_cls_hidden_states and append to states
+                init_states, detached_states = get_init_and_detached_states(full_init_cls_hidden_states, full_init_reg_hidden_states)
+
+                states.append((None, (init_states[0], init_states[1])))
+                states.append(((detached_states[0], detached_states[1]),(new_reg_hidden_states, new_cls_hidden_states)))
+            else:
+                states.append(((current_reg_hidden_states, current_cls_hidden_states),(new_reg_hidden_states, new_cls_hidden_states)))
 
             while len(states) > k2:
                 del states[0]
 
 
-            if accumulation_counter % grad_accumulate_iterations ==0: #Remember: can't use variable grad with trunc bptt
-                print("Running optimizer step")
+            if should_backprop(accumulation_counter, grad_accumulate_iterations, step_counter, train_set_idx, args): #Remember: can't use variable grad with trunc bptt
+
                 optimizer.zero_grad()
 
                 loss.backward(retain_graph=retain_graph)
 
                 if args.truncate_bptt:
                     for i in range(k2-1):
-                        if states[-i-2] is None:
+                        if len(states) == 1 or states[-i-2][0] is None:
                             break
-                        reg_hidden_states, cls_hidden_states = states[-i-1]
-                        reg_hidden_states_prev, cls_hidden_states_prev = states[-i-2]
+                        reg_hidden_states, cls_hidden_states = states[-i-1][0]
+                        reg_hidden_states_prev, cls_hidden_states_prev = states[-i-2][1]
                         for reg_hidden, cls_hidden,reg_hidden_prev, cls_hidden_prev in zip(reg_hidden_states, cls_hidden_states, reg_hidden_states_prev, cls_hidden_states_prev):
                             for reg_temp_layer, cls_temp_layer,reg_temp_layer_prev, cls_temp_layer_prev in zip(reg_hidden, cls_hidden,reg_hidden_prev, cls_hidden_prev):
                                 reg_h, reg_c = reg_temp_layer[0]
@@ -418,27 +421,70 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                                 reg_h_prev, reg_c_prev = reg_temp_layer_prev[0]
                                 #print("reg_h_prev shape: ", reg_h_prev.shape, reg_h_prev.device)
                                 reg_h_prev.backward(h_grad, retain_graph=retain_graph)
-                                reg_c_prev.backward(c_grad, retain_graph=retain_graph)
+                                #reg_c_prev.backward(c_grad, retain_graph=retain_graph)
 
                                 cls_h, cls_c = cls_temp_layer[0]
                                 h_grad = cls_h.grad
                                 c_grad = cls_c.grad
                                 cls_h_prev, cls_c_prev = cls_temp_layer_prev[0]
                                 cls_h_prev.backward(h_grad, retain_graph=retain_graph)
-                                cls_c_prev.backward(c_grad, retain_graph=retain_graph)
+                                #cls_c_prev.backward(c_grad, retain_graph=retain_graph)
+
+                    print("Running optimizer step")
                     optimizer.step()
                     scheduler.step()
 
+                    todo_forward_passes= len(states) - 1
+
+                    #states.clear()
+                    for i in range(todo_forward_passes):
+
+                        # Repeat forward step after optimized step (to make computation graph of new states consistent with model weights)
+                        #if args.truncate_bptt and len(states) > 2:
+
+
+                        images, gts, counts = data_store[i]
+                        images = images.cuda()
+                        gts = gts.cuda()
+                        counts = counts.cuda()
+
+
+
+                        if i == 0 and len(states) < k2:
+                            current_reg_hidden_states = None
+                            current_cls_hidden_states = None
+                        else:
+                            current_cls_hidden_states, current_reg_hidden_states = detach_ith_states(states, i)
+
+                        _, _, _, new_reg_hidden_states, new_cls_hidden_states, full_init_reg_hidden_states, full_init_cls_hidden_states = net(
+                            images, gts, counts, reg_hidden_states=current_reg_hidden_states,
+                            cls_hidden_states=current_cls_hidden_states)
+
+
+                        if i == 0 and len(states) < k2:
+                            states.clear()
+                            init_states, detached_states = get_init_and_detached_states(full_init_cls_hidden_states,
+                                                                                        full_init_reg_hidden_states)
+
+                            states.append((None, (init_states[0], init_states[1])))
+                            states.append(
+                                ((detached_states[0], detached_states[1]), (new_reg_hidden_states, new_cls_hidden_states)))
+                        else:
+                            states[i+1] = ((current_reg_hidden_states, current_cls_hidden_states),
+                                           (new_reg_hidden_states, new_cls_hidden_states))
 
                     step_counter += 1
-                    if step_counter * get_data_loader_batch_size(args) * grad_accumulate_iterations > args.train_set_sizes[train_set_idx % len(args.train_set_sizes)]:
+                    if should_reset_states(step_counter, grad_accumulate_iterations, train_set_idx, args):
+                        print("Resetting states")
                         train_set_idx += 1
                         step_counter = 0
-                        states = []
-                        reg_hidden_states = None
-                        cls_hidden_states = None
+                        states.clear()
+                        current_reg_hidden_states = None
+                        current_cls_hidden_states = None
+
 
                 else:
+                    print("Running optimizer step")
                     optimizer.step()
                     scheduler.step()
 
@@ -449,29 +495,28 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                         train_set_idx += 1
                         grad_accumulate_iterations = args.train_set_sizes[train_set_idx % len(args.train_set_sizes)]
                         states = []
-                        reg_hidden_states = None
-                        cls_hidden_states = None
+                        current_reg_hidden_states = None
+                        current_cls_hidden_states = None
 
 
-                    elif step_counter * get_data_loader_batch_size(args) * grad_accumulate_iterations > args.train_set_sizes[train_set_idx % len(args.train_set_sizes)]:
+                    elif step_counter * get_data_loader_batch_size(args) * grad_accumulate_iterations >= args.train_set_sizes[train_set_idx % len(args.train_set_sizes)]:
                         train_set_idx += 1
                         step_counter = 0
-                        states = []
-                        reg_hidden_states = None
-                        cls_hidden_states = None
+                        states.clear()
+                        current_reg_hidden_states = None
+                        current_cls_hidden_states = None
 
                     elif args.reset_hidden_every_step:
                         states = []
-                        reg_hidden_states = None
-                        cls_hidden_states = None
+                        current_reg_hidden_states = None
+                        current_cls_hidden_states = None
 
                 accumulation_counter = 0
                 loss = torch.zeros(1, requires_grad=True).cuda()
                 #loss.detach()
+                #reg_hidden_states, cls_hidden_states = new_reg_hidden_states, new_cls_hidden_states
             else:
-                if not args.truncate_bptt:
-                    loss.backward()
-                    loss = torch.zeros(1, requires_grad=True).cuda()
+                #step_counter += 1
                 scheduler.step()
 
             #loss.backward()
@@ -579,11 +624,80 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     log_file.close()
 
 
+def detach_ith_states(states, i=-1):
+    reg_hidden_states, cls_hidden_states = states[i][1]
+    current_reg_hidden_states, current_cls_hidden_states = [], []
+    for reg_hidden, cls_hidden in zip(reg_hidden_states, cls_hidden_states):
+        current_reg_fpn_ftr, current_cls_fpn_ftr = [], []
+        for reg_temp_layer, cls_temp_layer in zip(reg_hidden, cls_hidden):
+            current_reg_temp_layer, current_cls_temp_layer = [], []
+            reg_h, reg_c = reg_temp_layer[0]  # Hard coded for now to assume single layer convlstm block
+            detach_reg_h = reg_h.detach()
+            detach_reg_c = reg_c.detach()
+            detach_reg_h.requires_grad = True
+            detach_reg_c.requires_grad = True
+
+            current_reg_temp_layer.append((detach_reg_h, detach_reg_c))
+
+            cls_h, cls_c = cls_temp_layer[0]
+            detach_cls_h = cls_h.detach()
+            detach_cls_c = cls_c.detach()
+            detach_cls_h.requires_grad = True
+            detach_cls_c.requires_grad = True
+
+            current_cls_temp_layer.append((detach_cls_h, detach_cls_c))
+
+            current_reg_fpn_ftr.append(current_reg_temp_layer)
+            current_cls_fpn_ftr.append(current_cls_temp_layer)
+
+        current_reg_hidden_states.append(current_reg_fpn_ftr)
+        current_cls_hidden_states.append(current_cls_fpn_ftr)
+    return current_cls_hidden_states, current_reg_hidden_states
+
+
+def get_init_and_detached_states(full_init_cls_hidden_states, full_init_reg_hidden_states):
+    init_reg_hidden_states, init_cls_hidden_states = [], []
+    detached_reg_hidden_states, detached_cls_hidden_states = [], []
+    for reg_hidden, cls_hidden in zip(full_init_reg_hidden_states, full_init_cls_hidden_states):
+        init_reg_fpn_ftr, init_cls_fpn_ftr = [], []
+        detached_reg_fpn_ftr, detached_cls_fpn_ftr = [], []
+        for reg_temp_layer, cls_temp_layer in zip(reg_hidden, cls_hidden):
+            init_reg_fpn_ftr.append(reg_temp_layer[0])
+            detached_reg_fpn_ftr.append(reg_temp_layer[1])
+
+            init_cls_fpn_ftr.append(cls_temp_layer[0])
+            detached_cls_fpn_ftr.append(cls_temp_layer[1])
+
+        init_reg_hidden_states.append(init_reg_fpn_ftr)
+        init_cls_hidden_states.append(init_cls_fpn_ftr)
+
+        detached_reg_hidden_states.append(detached_reg_fpn_ftr)
+        detached_cls_hidden_states.append(detached_cls_fpn_ftr)
+    return (init_reg_hidden_states, init_cls_hidden_states), (detached_reg_hidden_states, detached_cls_hidden_states)
+
+
+def init_states_list():
+    return [], []
+
+
 def get_data_loader_batch_size(args):
     #return args.batch_size if not args.time_distributed_backbone else args.batch_size + args.temporal_slice_timesteps - 1
     return args.batch_size if not args.time_distributed_backbone else args.batch_size * args.temporal_slice_timesteps
 
-
+def should_backprop(accumulation_counter, grad_accumulate_iterations, step_counter, train_set_idx, args):
+    if accumulation_counter % grad_accumulate_iterations ==0:
+        return True
+    elif args.truncate_bptt and args.override_optimization_steps_tbptt and step_counter % args.overrided_optimization_steps == 0:
+        return True
+    elif args.truncate_bptt and (accumulation_counter*get_data_loader_batch_size(args) + (step_counter * get_data_loader_batch_size(args) * grad_accumulate_iterations)) >= args.train_set_sizes[train_set_idx % len(args.train_set_sizes)]:
+        return True
+    return False
+def should_reset_states(step_counter, grad_accumulate_iterations, train_set_idx, args):
+    if step_counter * get_data_loader_batch_size(args) * grad_accumulate_iterations >= args.train_set_sizes[train_set_idx % len(args.train_set_sizes)]:
+        return True
+    if args.override_optimization_steps_tbptt and step_counter % args.overrided_optimization_steps == 0:
+        return True
+    return False
 def construct_temporal_batches(images, batch_size, timesteps):
     _, channels, height, width = images.shape
     #images_td = torch.tensor([])
@@ -601,7 +715,7 @@ def load_model_state_dict(model_file_name, net):
     #        net_state_dict[k.replace("backbone_net.","backbone_net.td_net.")] = net_state_dict[k]
     #        del net_state_dict[k]
     #torch.save(net_state_dict, '{:s}/model_{:06d}.pth'.format(args.save_root, 14000))
-    net.load_state_dict(net_state_dict, strict=True)
+    net.load_state_dict(net_state_dict, strict=False)
 
 
 def param_dict_exists(param_dict, param_dicts):
@@ -659,7 +773,7 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, iou_thresh
 
 
 
-            decoded_boxes, conf_data, reg_hidden_states, cls_hidden_states = net(images, reg_hidden_states=reg_hidden_states, cls_hidden_states=cls_hidden_states)
+            decoded_boxes, conf_data, reg_hidden_states, cls_hidden_states,_, _ = net(images, reg_hidden_states=reg_hidden_states, cls_hidden_states=cls_hidden_states)
 
             conf_scores_all = activation(conf_data).clone()
 

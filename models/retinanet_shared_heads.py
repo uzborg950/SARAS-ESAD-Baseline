@@ -123,6 +123,9 @@ class RetinaNet(nn.Module):
         phases = list()
         reg_hidden_states_pyramid = list()
         cls_hidden_states_pyramid = list()
+
+        reg_init_hidden_states_pyramid = list()
+        cls_init_hidden_states_pyramid = list()
         for idx, x in enumerate(features):
             if not self.append_reg_temporal_net:
                 if self.time_distributed_backbone:
@@ -130,8 +133,10 @@ class RetinaNet(nn.Module):
                 else:
                     reg_out = self.reg_heads(x)  # 2,25,45,36 (same as P3 w,h)
             else:
-                reg_out, reg_hidden_states_layer = self.get_temporal_output(self.reg_temporal[idx], x, reg_hidden_states[idx] if reg_hidden_states is not None else None)
+                reg_out, reg_hidden_states_layer, reg_init_hidden_states_layer = self.get_temporal_output(self.reg_temporal[idx], x, reg_hidden_states[idx] if reg_hidden_states is not None else None)
                 reg_hidden_states_pyramid.append(reg_hidden_states_layer)
+                if reg_init_hidden_states_layer:
+                    reg_init_hidden_states_pyramid.append(reg_init_hidden_states_layer)
 
 
 
@@ -141,8 +146,10 @@ class RetinaNet(nn.Module):
                 else:
                     cls_out = self.cls_heads(x)
             else:
-                cls_out, cls_hidden_state_layer = self.get_temporal_output(self.cls_temporal[idx], x, cls_hidden_states[idx] if cls_hidden_states is not None else None)
+                cls_out, cls_hidden_state_layer, cls_init_hidden_states_layer = self.get_temporal_output(self.cls_temporal[idx], x, cls_hidden_states[idx] if cls_hidden_states is not None else None)
                 cls_hidden_states_pyramid.append(cls_hidden_state_layer)
+                if cls_init_hidden_states_layer:
+                    cls_init_hidden_states_pyramid.append(cls_init_hidden_states_layer)
 
 
             reg_out = reg_out.permute(0, 2, 3, 1).contiguous()
@@ -168,9 +175,9 @@ class RetinaNet(nn.Module):
                                0), flat_conf, features
         elif gts is not None:  # training mode
             loss_l, loss_c, loss_p, = self.criterion(flat_conf, flat_loc, gts, counts, anchor_boxes, images, predicted_phase=out_phase)
-            return loss_l, loss_c, loss_p, reg_hidden_states_pyramid, cls_hidden_states_pyramid
+            return loss_l, loss_c, loss_p, reg_hidden_states_pyramid, cls_hidden_states_pyramid, reg_init_hidden_states_pyramid, cls_init_hidden_states_pyramid
         else:  # otherwise testing mode
-            return torch.stack([decode(flat_loc[b], anchor_boxes) for b in range(flat_loc.shape[0])], 0), flat_conf, reg_hidden_states_pyramid, cls_hidden_states_pyramid
+            return torch.stack([decode(flat_loc[b], anchor_boxes) for b in range(flat_loc.shape[0])], 0), flat_conf, reg_hidden_states_pyramid, cls_hidden_states_pyramid, reg_init_hidden_states_pyramid, cls_init_hidden_states_pyramid
 
     def collate_timesteps(self, out):
         batch, timesteps, channels, height, width = out.shape
@@ -184,8 +191,8 @@ class RetinaNet(nn.Module):
         return out.view(batch * timesteps, channels, height, width)
 
     def get_temporal_output(self, temporal_net, x, hidden_states):
-        out, hidden_states = temporal_net(x, hidden_states)
-        return self.collate_timesteps(out), hidden_states
+        out, hidden_states, init_hidden_states = temporal_net(x, hidden_states)
+        return self.collate_timesteps(out), hidden_states , init_hidden_states
 
     def make_features(self, shared_heads):
         layers = []
@@ -193,7 +200,7 @@ class RetinaNet(nn.Module):
         head_size = self.head_size
         for _ in range(shared_heads):
             layers.append(nn.Conv2d(head_size, head_size, kernel_size=3, stride=1, padding=1, bias=use_bias))
-            layers.append(nn.ReLU(True))
+            layers.append(nn.ReLU(False))
 
         layers = nn.Sequential(*layers)
 
@@ -215,7 +222,7 @@ class RetinaNet(nn.Module):
             else:
                 conv2d = self.make_conv2d(head_size, head_size, kernel_size=3, stride=1, padding=1, use_bias=use_bias, init_bg_prob=False)
             layers.append(conv2d)
-            layers.append(nn.ReLU(True))
+            layers.append(nn.ReLU(False))
 
         if time_distributed:
             conv_head = TimeDistributed5D(self.make_conv2d(head_size, out_planes, kernel_size=3, stride=1, padding=1, use_bias=True, init_bg_prob=init_bg_prob), self.temporal_slice_timesteps)

@@ -135,6 +135,19 @@ class ConvLSTM(nn.Module):
 
         self.cell_list = nn.ModuleList(cell_list)
 
+    def _detach_hidden_states(self, hidden_states):
+        detached_states = []
+        for hidden_state in hidden_states:
+            h, c = hidden_state
+            detached_h = h.detach()
+            detached_c = c.detach()
+
+            detached_h.requires_grad = True
+            detached_c.requires_grad = True
+
+            detached_states.append((detached_h, detached_c))
+        return detached_states
+
     def forward(self, input_tensor, hidden_states=None):
         """
 
@@ -158,17 +171,19 @@ class ConvLSTM(nn.Module):
         # Implement stateful ConvLSTM
         #if hidden_states is not None:
         #    hidden_states = [(hidden_states[0], hidden_states[1])]
-        if hidden_states is None:
+        init_states = hidden_states is None
+        if init_states:
             # Since the init is done in forward. Can send image size here
-            hidden_states = self._init_hidden(batch_size=b,
+            init_hidden_states = self._init_hidden(batch_size=b,
                                              image_size=(h, w))
+            hidden_states = self._detach_hidden_states(init_hidden_states)
 
         layer_output_list = []
         last_state_list = []
 
         seq_len = input_tensor.size(1)
         cur_layer_input = input_tensor
-
+        output_hidden_states = [None] * len(hidden_states)
         for layer_idx in range(self.num_layers):
 
             h, c = hidden_states[layer_idx]
@@ -184,14 +199,14 @@ class ConvLSTM(nn.Module):
 
             layer_output_list.append(layer_output)
             last_state_list.append([h, c])
-            hidden_states[layer_idx] = h, c
+            output_hidden_states[layer_idx] = h, c
 
 
         if not self.return_all_layers:
             layer_output_list = layer_output_list[-1:]
             last_state_list = last_state_list[-1:]
 
-        return layer_output_list, last_state_list, hidden_states
+        return layer_output_list, last_state_list, output_hidden_states, (init_hidden_states, hidden_states) if init_states else None
 
     def _init_hidden(self, batch_size, image_size):
         init_states = []

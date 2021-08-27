@@ -40,13 +40,13 @@ from functools import partial
 
 parser = argparse.ArgumentParser(description='Training single stage FPN with OHEM, resnet as backbone')
 #Predicted Bounding Box visualisation
-parser.add_argument('--generate_frames', default=True,type=str2bool, help='Generate frame containing GT and predicted bounding boxes')
+parser.add_argument('--generate_frames', default=False,type=str2bool, help='Generate frame containing GT and predicted bounding boxes')
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
 parser.add_argument('--basenet', default='resnet18', help='pretrained base model')
 #Binary classification loss
 parser.add_argument('--bin_loss', default=True, type=str2bool,help='Include binary classification loss (object/background')
 # Multi-Task Surgical Phase Detection
-parser.add_argument('--predict_surgical_phase', default=True, type=str2bool, help='predict surgical phase as well')
+parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, help='predict surgical phase as well')
 parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')
 # Use Time Distribution for CNN backbone
 parser.add_argument('--time_distributed_backbone', default=True, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
@@ -94,7 +94,7 @@ parser.add_argument('--freezeupto', default=1, type=int, help='if 0 freeze or el
 parser.add_argument('--iou_threshs', default='0.1,0.3,0.5', type=str, help='Evaluation thresholds')
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation') #0.05
 parser.add_argument('--nms_thresh', default=0.5, type=float, help='NMS threshold') #0.5
-parser.add_argument('--topk', default=3, type=int, help='topk for evaluation') #25
+parser.add_argument('--topk', default=25, type=int, help='topk for evaluation') #25
 
 # Progress logging
 parser.add_argument('--log_iters', default=True, type=str2bool, help='Print the loss at each iteration')
@@ -141,7 +141,7 @@ def main():
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
     if True: # while validating
-        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['train/set1'], transform=val_transform, full_test=True, include_phase=args.predict_surgical_phase, batch=get_data_loader_batch_size(
+        val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['val/obj'], transform=val_transform, full_test=True, include_phase=args.predict_surgical_phase, batch=get_data_loader_batch_size(
             args))# val/obj
     else: # while testing
         val_dataset = DetectionDataset(root= args.data_root, train=False, input_sets=['testC'], transform=val_transform, full_test=True, include_phase=args.predict_surgical_phase, batch=get_data_loader_batch_size(
@@ -289,7 +289,7 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, submission
 
 
 
-            decoded_boxes, conf_data, reg_hidden_states, cls_hidden_states = net(images, reg_hidden_states=reg_hidden_states, cls_hidden_states=cls_hidden_states)
+            decoded_boxes, conf_data, reg_hidden_states, cls_hidden_states,_, _ = net(images, reg_hidden_states=reg_hidden_states, cls_hidden_states=cls_hidden_states)
 
             conf_scores_all = activation(conf_data).clone()
 

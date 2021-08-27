@@ -17,7 +17,7 @@ class ConvLSTMBlock(nn.Module):
         out = self.convlstm(input, hidden_states=hidden_states)
 
         #return out[0][0]
-        return out[0], out[2]
+        return out[0], out[2], out[3]
 
     def _make_convlstm(self, input_dim, hidden_dim, kernel_size=(3, 3), num_layers=1, batch_first=True, bias=True,
                        return_all_layers=True):
@@ -37,7 +37,7 @@ class TemporalLayer(nn.Module):
         self.convlstm = ConvLSTMBlock(inplanes, inplanes, convlstm_layers, use_bias)
         self.td_conv2d =  TimeDistributed5D(make_conv2d(inplanes, inplanes, kernel_size=3, stride=1, padding=1, use_bias=use_bias).cuda(), timesteps)
         self.td_batchnorm = TimeDistributed5D(make_batchnorm(inplanes).cuda(), timesteps)
-        self.relu = nn.ReLU(True)
+        self.relu = nn.ReLU(False)
 
 
 
@@ -47,7 +47,7 @@ class TemporalLayer(nn.Module):
         out = self.td_conv2d(convlstm_out[0][0])
         out = self.td_batchnorm(out)
         out = self.relu(out)
-        return (out, convlstm_out[1])
+        return (out, convlstm_out[1], convlstm_out[2])
 
 
 def make_batchnorm(inplanes):
@@ -89,13 +89,19 @@ class TemporalNet(nn.Module):
 
     def forward(self, input, hidden_states_layers):
         hidden_states_layers_next = []
+        init_hidden_states_layers_next = []
+        batch, timesteps = input.shape[0], input.shape[1]
+        input = input.reshape(1, -1,input.shape[2],input.shape[3],input.shape[4]) #All batches are considered to be in order, so consider all to be one big batch
         for idx, layer in enumerate(self.temporal_layers):
             out = layer((input, hidden_states_layers[idx] if hidden_states_layers is not None else None))
             hidden_states_layers_next.append(out[1])
+            if out[2] is not None:
+                init_hidden_states_layers_next.append(out[2])
             input = out[0]
 
         out = self.td_conv_head(out[0])
-        return out, hidden_states_layers_next
+        out = out.reshape(batch,timesteps,out.shape[2],out.shape[3],out.shape[4])
+        return out, hidden_states_layers_next, init_hidden_states_layers_next
 
     def _conv1x1(self, in_channel, out_channel, bias):
         return nn.Conv2d(in_channel, out_channel, kernel_size=1, bias=bias)

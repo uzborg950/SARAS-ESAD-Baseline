@@ -251,7 +251,7 @@ class FocalLoss(nn.Module):
             for b in range(len(gts)):
                 #frame_utils.generate_frame(images[b].permute(1, 2,0), gts[b, :, :], time.strftime("%H-%M-%S", time.localtime())+ ".jpg")
                 if self.include_phase:
-                    gt_phases.append(gts[b, -1, 4])
+                    gt_phases.append(gts[b, counts[b]-1, 4])
                     num_actions = counts[b] - 1
                 else:
                     num_actions = counts[b]
