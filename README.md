@@ -12,22 +12,29 @@ The project is a fork of https://github.com/Viveksbawa/SARAS-ESAD-Baseline. It m
 
 
 ### Primary Features (so far)
-
-- RetinaNet + Temporal network of configurable depth n (ConvLSTM, Conv2d, BatchNorm, Relu) x n
+- Repeat last frames from individual surgical footage to create full mini-batches consisting of frames from the same footage (useful for stateful models).
+- Temporal subnets (ConvLSTM, Conv2d, BatchNorm, Relu)
+- Truncated backpropagation through time. Persisting states in forward passes. States reset before the next surgical footage is passed.
+- Partial loading of model weights through config: --load_non_strict_pretrained and --pretrained_iter. For e.g. Train RetinaNet independently then use ResnetFPN weights in TempRetinaNet.
+- Convert normal dataset to time slices by config: --time_distributed_backbone=True and --temporal_slice_timesteps. batch_size * temporal_slice_timesteps = Total batch size loaded in one step.
+- Create high contrast image by: --shifted_mean=True
+- Predict surgical phase in multi-task manner: --predict_surgical_phase=True and --num_phases
 
 ### Fineprint
-Due to computational limitations, all work is being demonstrated on the following specs:
+Due to computational limitations, experiments are run in the following configs depending on what can be accomodated:
 - Resnet18
-- Input size = 600
+- Input size = 200, 600
 - Focal loss (Due to its capability of down-weighting easy examples)
-- batch size = 16
+- batch size = 2, 4, 8, 16
 
 ### Demo 
-
+- Input size = 200
+- Total batch size=16, where batch_size=4 and temporal_slice_timesteps=4
 - Temporal layer depth = 2
 - Ground Truth = green
 
-![ezgif com-gif-maker](https://user-images.githubusercontent.com/16350367/124778681-941e5a80-df5a-11eb-833f-2b2d0e36cb2e.gif)
+![ezgif com-gif-maker](https://user-images.githubusercontent.com/16350367/130421530-0c900896-a416-4a3c-af1c-8008cb5070e6.gif)
+
 
 
 ### Results
