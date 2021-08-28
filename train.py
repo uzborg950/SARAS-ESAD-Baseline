@@ -62,7 +62,7 @@ parser.add_argument('--predict_surgical_phase', default=False, type=str2bool, he
 parser.add_argument('--num_phases', default=4, type=int, help='Total number of phases')
 # Use Time Distribution for CNN backbone
 parser.add_argument('--time_distributed_backbone', default=True, type=str2bool, help='Make backbone time distributed (Apply the same backbone weights to a number of timesteps')
-parser.add_argument('--temporal_slice_timesteps', default=2, type=int, help='Number of timesteps/frame comprising a temporal slice')
+parser.add_argument('--temporal_slice_timesteps', default=1, type=int, help='Number of timesteps/frame comprising a temporal slice')
 # Use ConvLSTM
 parser.add_argument('--append_cls_temporal_net', default=True, type=str2bool, help='Append cls temporal model after FPN, before cls predictor conv head')
 parser.add_argument('--append_reg_temporal_net', default=True, type=str2bool, help='Append regression temporal model after FPN, before regression predictor conv head')
@@ -70,7 +70,7 @@ parser.add_argument('--convlstm_layers', default=1, type=int, help='Number of st
 parser.add_argument('--temporal_net_layers', default=2, type=int, help='Number of temporal net layers (each layer = ConvLSTM(s) + Conv2d + batch norm + relu)')
 parser.add_argument('--truncate_bptt', default=True, type=str2bool, help='Truncate iterations during BPTT to down-scale computation graph') #True
 parser.add_argument('--k1', default=1, type=int, help='Number of forward pass timesteps between updates')
-parser.add_argument('--k2', default=3, type=int, help='Number of timesteps to apply bptt to')
+parser.add_argument('--k2', default=2, type=int, help='Number of timesteps to apply bptt to')
 parser.add_argument('--grad_accumulate_iterations', default=1, type=int, help='Accumulate gradients accross mini-batches upto the given number of iterations') #100
 parser.add_argument('--enable_variable_grad_accumulation', default=False, type=str2bool, help='Configure gradient accumulation across full train sets of variable sizes')
 parser.add_argument('--override_optimization_steps_tbptt', default=False, type=str2bool, help='Override when optimization is run in TBPTT')#False
@@ -415,20 +415,22 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                         reg_hidden_states_prev, cls_hidden_states_prev = states[-i-2][1]
                         for reg_hidden, cls_hidden,reg_hidden_prev, cls_hidden_prev in zip(reg_hidden_states, cls_hidden_states, reg_hidden_states_prev, cls_hidden_states_prev):
                             for reg_temp_layer, cls_temp_layer,reg_temp_layer_prev, cls_temp_layer_prev in zip(reg_hidden, cls_hidden,reg_hidden_prev, cls_hidden_prev):
-                                reg_h, reg_c = reg_temp_layer[0]
-                                h_grad = reg_h.grad
-                                c_grad = reg_c.grad
-                                reg_h_prev, reg_c_prev = reg_temp_layer_prev[0]
-                                #print("reg_h_prev shape: ", reg_h_prev.shape, reg_h_prev.device)
-                                reg_h_prev.backward(h_grad, retain_graph=retain_graph)
-                                #reg_c_prev.backward(c_grad, retain_graph=retain_graph)
+                                for reg_temp_block, cls_temp_block, reg_temp_block_prev, cls_temp_block_prev in zip(
+                                        reg_temp_layer, cls_temp_layer, reg_temp_layer_prev, cls_temp_layer_prev):
+                                    reg_h, reg_c = reg_temp_block[0]
+                                    h_grad = reg_h.grad
+                                    c_grad = reg_c.grad
+                                    reg_h_prev, reg_c_prev = reg_temp_block_prev[0]
+                                    #print("reg_h_prev shape: ", reg_h_prev.shape, reg_h_prev.device)
+                                    reg_h_prev.backward(h_grad, retain_graph=retain_graph)
+                                    #reg_c_prev.backward(c_grad, retain_graph=retain_graph)
 
-                                cls_h, cls_c = cls_temp_layer[0]
-                                h_grad = cls_h.grad
-                                c_grad = cls_c.grad
-                                cls_h_prev, cls_c_prev = cls_temp_layer_prev[0]
-                                cls_h_prev.backward(h_grad, retain_graph=retain_graph)
-                                #cls_c_prev.backward(c_grad, retain_graph=retain_graph)
+                                    cls_h, cls_c = cls_temp_block[0]
+                                    h_grad = cls_h.grad
+                                    c_grad = cls_c.grad
+                                    cls_h_prev, cls_c_prev = cls_temp_block_prev[0]
+                                    cls_h_prev.backward(h_grad, retain_graph=retain_graph)
+                                    #cls_c_prev.backward(c_grad, retain_graph=retain_graph)
 
                     print("Running optimizer step")
                     optimizer.step()
@@ -462,13 +464,12 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
 
                         if i == 0 and len(states) < k2:
-                            states.clear()
+                            states = [None] * len(states)
                             init_states, detached_states = get_init_and_detached_states(full_init_cls_hidden_states,
                                                                                         full_init_reg_hidden_states)
 
-                            states.append((None, (init_states[0], init_states[1])))
-                            states.append(
-                                ((detached_states[0], detached_states[1]), (new_reg_hidden_states, new_cls_hidden_states)))
+                            states[0] = (None, (init_states[0], init_states[1]))
+                            states[1] = ((detached_states[0], detached_states[1]), (new_reg_hidden_states, new_cls_hidden_states))
                         else:
                             states[i+1] = ((current_reg_hidden_states, current_cls_hidden_states),
                                            (new_reg_hidden_states, new_cls_hidden_states))
@@ -631,22 +632,26 @@ def detach_ith_states(states, i=-1):
         current_reg_fpn_ftr, current_cls_fpn_ftr = [], []
         for reg_temp_layer, cls_temp_layer in zip(reg_hidden, cls_hidden):
             current_reg_temp_layer, current_cls_temp_layer = [], []
-            reg_h, reg_c = reg_temp_layer[0]  # Hard coded for now to assume single layer convlstm block
-            detach_reg_h = reg_h.detach()
-            detach_reg_c = reg_c.detach()
-            detach_reg_h.requires_grad = True
-            detach_reg_c.requires_grad = True
+            for reg_temp_block, cls_temp_block in zip(reg_temp_layer, cls_temp_layer):
 
-            current_reg_temp_layer.append((detach_reg_h, detach_reg_c))
+                current_reg_temp_block, current_cls_temp_block = [], []
+                reg_h, reg_c = reg_temp_block[0]  # Hard coded for now to assume single layer convlstm block
+                detach_reg_h = reg_h.detach()
+                detach_reg_c = reg_c.detach()
+                detach_reg_h.requires_grad = True
+                detach_reg_c.requires_grad = True
 
-            cls_h, cls_c = cls_temp_layer[0]
-            detach_cls_h = cls_h.detach()
-            detach_cls_c = cls_c.detach()
-            detach_cls_h.requires_grad = True
-            detach_cls_c.requires_grad = True
+                current_reg_temp_block.append((detach_reg_h, detach_reg_c))
 
-            current_cls_temp_layer.append((detach_cls_h, detach_cls_c))
+                cls_h, cls_c = cls_temp_block[0]
+                detach_cls_h = cls_h.detach()
+                detach_cls_c = cls_c.detach()
+                detach_cls_h.requires_grad = True
+                detach_cls_c.requires_grad = True
 
+                current_cls_temp_block.append((detach_cls_h, detach_cls_c))
+                current_reg_temp_layer.append(current_reg_temp_block)
+                current_cls_temp_layer.append(current_cls_temp_block)
             current_reg_fpn_ftr.append(current_reg_temp_layer)
             current_cls_fpn_ftr.append(current_cls_temp_layer)
 
@@ -662,11 +667,20 @@ def get_init_and_detached_states(full_init_cls_hidden_states, full_init_reg_hidd
         init_reg_fpn_ftr, init_cls_fpn_ftr = [], []
         detached_reg_fpn_ftr, detached_cls_fpn_ftr = [], []
         for reg_temp_layer, cls_temp_layer in zip(reg_hidden, cls_hidden):
-            init_reg_fpn_ftr.append(reg_temp_layer[0])
-            detached_reg_fpn_ftr.append(reg_temp_layer[1])
+            init_reg_temp_blocks, init_cls_temp_blocks = [], []
+            detached_reg_temp_blocks, detached_cls_temp_blocks = [], []
+            for reg_temp_block, cls_temp_block in zip(reg_temp_layer, cls_temp_layer):
+                init_reg_temp_blocks.append(reg_temp_block[0])
+                detached_reg_temp_blocks.append(reg_temp_block[1])
 
-            init_cls_fpn_ftr.append(cls_temp_layer[0])
-            detached_cls_fpn_ftr.append(cls_temp_layer[1])
+                init_cls_temp_blocks.append(cls_temp_block[0])
+                detached_cls_temp_blocks.append(cls_temp_block[1])
+
+            init_reg_fpn_ftr.append(init_reg_temp_blocks)
+            init_cls_fpn_ftr.append(init_cls_temp_blocks)
+
+            detached_reg_fpn_ftr.append(detached_reg_temp_blocks)
+            detached_cls_fpn_ftr.append(detached_cls_temp_blocks)
 
         init_reg_hidden_states.append(init_reg_fpn_ftr)
         init_cls_hidden_states.append(init_cls_fpn_ftr)

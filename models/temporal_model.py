@@ -39,15 +39,34 @@ class TemporalLayer(nn.Module):
         self.td_batchnorm = TimeDistributed5D(make_batchnorm(inplanes).cuda(), timesteps)
         self.relu = nn.ReLU(False)
 
+        self.convlstm2 = ConvLSTMBlock(inplanes, inplanes, convlstm_layers, use_bias)
+        self.td_conv2d2 = TimeDistributed5D(make_conv2d(inplanes, inplanes, kernel_size=3, stride=1, padding=1, use_bias=use_bias).cuda(), timesteps)
+        self.td_batchnorm2 = TimeDistributed5D(make_batchnorm(inplanes).cuda(), timesteps)
+        self.relu2 = nn.ReLU(False)
+
 
 
     def forward(self, input_tuple):
+        hidden_states_out = list()
+        hidden_states_init = list()
         input, hidden_states = input_tuple
-        convlstm_out = self.convlstm(input, hidden_states)
+        convlstm_out = self.convlstm(input, hidden_states[0] if hidden_states is not None else None)
         out = self.td_conv2d(convlstm_out[0][0])
         out = self.td_batchnorm(out)
         out = self.relu(out)
-        return (out, convlstm_out[1], convlstm_out[2])
+
+        hidden_states_out.append(convlstm_out[1])
+        hidden_states_init.append(convlstm_out[2])
+
+        convlstm_out = self.convlstm2(out, hidden_states[1] if hidden_states is not None else None)
+        out = self.td_conv2d2(convlstm_out[0][0])
+        out = self.td_batchnorm2(out)
+        out = self.relu2(out)
+
+        hidden_states_out.append(convlstm_out[1])
+        hidden_states_init.append(convlstm_out[2])
+
+        return (out, hidden_states_out, hidden_states_init)
 
 
 def make_batchnorm(inplanes):
